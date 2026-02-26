@@ -1,0 +1,28 @@
+{
+  "name": "bch-tip-bot",
+  "version": "1.0.0",
+  "description": "Bitcoin Cash tip bot for X/Twitter",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "dotenv": "^17.3.1",
+    "mainnet-js": "^3.1.7",
+    "pino": "^10.3.1",
+    "twitter-api-v2": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.3.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
