@@ -79,8 +79,8 @@ export class DMPoller {
       this.pollState.set("last_dm_event_id", events[0].id);
     } catch (err: any) {
       if (err?.code === 429) {
-        this.backoffMs = 60_000; // Back off 1 minute on rate limit
-        logger.warn("Rate limited on DM endpoint, backing off 60s");
+        this.backoffMs = Math.min(this.backoffMs * 2 || 300_000, 900_000);
+        logger.warn(`Rate limited on DM endpoint, backing off ${this.backoffMs / 1000}s`);
       } else {
         logger.error({ err }, "Error polling DMs");
       }

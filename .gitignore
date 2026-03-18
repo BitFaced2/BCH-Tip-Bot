@@ -5,3 +5,7 @@ data/
 *.db
 *.db-wal
 *.db-shm
+*.odt
+*.odt#
+*.txt
+.~lock.*

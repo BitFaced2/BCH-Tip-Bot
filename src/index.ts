@@ -47,8 +47,10 @@ async function main(): Promise<void> {
     db,
     walletManager,
     config.tipFeePercent,
-    config.minTipSatoshis
+    config.minTipSatoshis,
+    config.feeAddress
   );
+  await tipService.initialize();
 
   // 5. Initialize command handlers
   const commandRouter = new CommandRouter({
@@ -64,7 +66,7 @@ async function main(): Promise<void> {
       config.minWithdrawalSatoshis,
       config.maxWithdrawalSatoshis
     ),
-    help: new HelpCommand(responder, "tipbot"), // TODO: configure bot username
+    help: new HelpCommand(responder, "bchtip"),
   });
 
   // 6. Initialize pollers

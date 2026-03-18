@@ -133,19 +133,33 @@ export class DepositMonitor {
           user.derivation_index
         );
 
-        // Get the raw transaction to check confirmations
-        const lastTx = await wallet.getLastTransaction();
-        if (!lastTx) continue;
+        // Get transaction history and find our tx by hash
+        const history = await wallet.getHistory();
+        if (!history || !Array.isArray(history)) continue;
 
-        // Estimate confirmations from block height
-        // If the transaction is in a block, it has at least 1 confirmation
-        const confirmations =
-          typeof lastTx === "object" &&
-          lastTx !== null &&
-          "blockHeight" in lastTx &&
-          (lastTx as { blockHeight: number }).blockHeight > 0
-            ? Math.max(1, tx.confirmations + 1)
-            : 0;
+        const matchingTx = history.find(
+          (h: any) => h.hash === tx.txid
+        ) as any;
+        if (!matchingTx) continue;
+
+        // Calculate confirmations from block height
+        let confirmations = 0;
+        if (matchingTx.blockHeight && matchingTx.blockHeight > 0) {
+          // Get current blockchain tip height
+          const currentHeight = await wallet.provider!.getBlockHeight();
+
+          if (currentHeight > 0) {
+            confirmations = currentHeight - matchingTx.blockHeight + 1;
+          } else {
+            // Fallback: at least 1 if in a block
+            confirmations = 1;
+          }
+        }
+
+        logger.info(
+          { txid: tx.txid, confirmations, blockHeight: matchingTx.blockHeight },
+          "Checking deposit confirmations"
+        );
 
         if (confirmations !== tx.confirmations) {
           this.transactionRepo.updateConfirmations(tx.id, confirmations);

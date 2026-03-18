@@ -20,16 +20,30 @@ export class TipService {
   private userRepo: UserRepository;
   private tipRepo: TipRepository;
   private balanceService: BalanceService;
+  private feeUserId?: number;
 
   constructor(
     private db: Database.Database,
     private walletManager: HDWalletManager,
     private tipFeePercent: number,
-    private minTipSatoshis: number
+    private minTipSatoshis: number,
+    private feeAddress: string = ""
   ) {
     this.userRepo = new UserRepository(db);
     this.tipRepo = new TipRepository(db);
     this.balanceService = new BalanceService(db);
+  }
+
+  async initialize(): Promise<void> {
+    if (!this.feeAddress) return;
+
+    // Create or find the fee collection account
+    let feeUser = this.userRepo.findByDepositAddress(this.feeAddress);
+    if (!feeUser) {
+      const index = this.userRepo.getNextDerivationIndex();
+      feeUser = this.userRepo.create("system_fee_account", "fee_collector", index, this.feeAddress);
+    }
+    this.feeUserId = feeUser.id;
   }
 
   async ensureUser(
@@ -108,7 +122,8 @@ export class TipService {
       sender.id,
       recipient.id,
       amountSatoshis,
-      feeSatoshis
+      feeSatoshis,
+      this.feeUserId
     );
 
     if (!transferred) {

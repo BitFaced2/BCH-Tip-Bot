@@ -33,6 +33,7 @@ export const config = {
   maxWithdrawalSatoshis: parseInt(optional("MAX_WITHDRAWAL_SATOSHIS", "100000000"), 10),
   withdrawalFeeSatoshis: parseInt(optional("WITHDRAWAL_FEE_SATOSHIS", "500"), 10),
   tipFeePercent: parseFloat(optional("TIP_FEE_PERCENT", "1")),
+  feeAddress: optional("FEE_ADDRESS", ""),
 
   // Database
   dbPath: optional("DB_PATH", "./data/tipbot.db"),

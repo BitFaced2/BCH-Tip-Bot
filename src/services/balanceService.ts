@@ -62,7 +62,8 @@ export class BalanceService {
     fromUserId: number,
     toUserId: number,
     amountSatoshis: number,
-    feeSatoshis: number
+    feeSatoshis: number,
+    feeUserId?: number
   ): boolean {
     if (amountSatoshis <= 0) {
       throw new Error("Transfer amount must be positive");
@@ -92,6 +93,18 @@ export class BalanceService {
         toUserId,
         recipient.balance_satoshis + recipientAmount
       );
+
+      // Credit fees to the fee account if configured
+      if (feeUserId && feeSatoshis > 0) {
+        const feeUser = this.userRepo.findById(feeUserId);
+        if (feeUser) {
+          this.userRepo.updateBalance(
+            feeUserId,
+            feeUser.balance_satoshis + feeSatoshis
+          );
+        }
+      }
+
       success = true;
     });
 
