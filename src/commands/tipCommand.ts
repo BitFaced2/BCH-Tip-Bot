@@ -42,6 +42,9 @@ export class TipCommand {
     );
 
     if (!result.success) {
+      // Silently skip already-processed tips
+      if (result.error === "This tip has already been processed.") return;
+
       await this.responder.replyToTweet(ctx.tweetId!, result.error!);
       return;
     }

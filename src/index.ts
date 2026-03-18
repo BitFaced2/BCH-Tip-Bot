@@ -75,6 +75,7 @@ async function main(): Promise<void> {
   const mentionPoller = new MentionPoller(
     twitterClient,
     config.twitterBotUserId,
+    "bchtip",
     config.pollIntervalMs,
     (ctx) => commandRouter.route(ctx),
     pollState

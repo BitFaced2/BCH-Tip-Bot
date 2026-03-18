@@ -12,6 +12,7 @@ export class MentionPoller {
   constructor(
     private client: TwitterApi,
     private botUserId: string,
+    private botUsername: string,
     private pollIntervalMs: number,
     private onCommand: (ctx: CommandContext) => Promise<void>,
     pollState: PollStateRepository
@@ -37,25 +38,28 @@ export class MentionPoller {
     try {
       const sinceId = this.pollState.get("last_mention_id");
 
-      const params: Record<string, string | string[]> = {
+      const params: Record<string, any> = {
         "tweet.fields": ["author_id", "created_at", "text"],
         "user.fields": ["username"],
         expansions: ["author_id"],
+        max_results: 100,
       };
       if (sinceId) {
         params.since_id = sinceId;
       }
 
-      const timeline = await this.client.v2.userMentionTimeline(
-        this.botUserId,
+      // Use search endpoint instead of mentions timeline
+      // This catches @bchtip mentions in replies, quote tweets, and standalone posts
+      const result = await this.client.v2.search(
+        `@${this.botUsername} -from:${this.botUsername}`,
         params
       );
 
-      const tweets = timeline.data?.data;
+      const tweets = result.data?.data;
       if (!tweets || tweets.length === 0) return;
 
       const users = new Map<string, string>();
-      for (const user of timeline.data?.includes?.users ?? []) {
+      for (const user of result.data?.includes?.users ?? []) {
         users.set(user.id, user.username);
       }
 
@@ -85,7 +89,7 @@ export class MentionPoller {
       this.pollState.set("last_mention_id", tweets[0].id);
     } catch (err: any) {
       if (err?.code === 429) {
-        logger.warn("Rate limited on mentions endpoint, backing off");
+        logger.warn("Rate limited on search endpoint, backing off");
       } else {
         logger.error({ err }, "Error polling mentions");
       }
