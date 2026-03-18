@@ -62,6 +62,14 @@ export class UserRepository {
       .run(username, userId);
   }
 
+  updateTwitterId(userId: number, twitterUserId: string): void {
+    this.db
+      .prepare(
+        "UPDATE users SET twitter_user_id = ?, updated_at = datetime('now') WHERE id = ?"
+      )
+      .run(twitterUserId, userId);
+  }
+
   getNextDerivationIndex(): number {
     const row = this.db
       .prepare("SELECT value FROM app_state WHERE key = 'next_derivation_index'")

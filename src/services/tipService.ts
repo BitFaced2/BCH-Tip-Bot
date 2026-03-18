@@ -60,17 +60,50 @@ export class TipService {
       return user;
     }
 
+    // Check if there's a pending account for this username that needs to be claimed
+    if (twitterUsername) {
+      const pendingUser = this.userRepo.findByTwitterId(
+        `pending_${twitterUsername.toLowerCase()}`
+      );
+      if (pendingUser) {
+        // Claim the pending account by updating the twitter_user_id
+        this.userRepo.updateTwitterId(pendingUser.id, twitterUserId);
+        this.userRepo.updateUsername(pendingUser.id, twitterUsername);
+        pendingUser.twitter_user_id = twitterUserId;
+        pendingUser.twitter_username = twitterUsername;
+        return pendingUser;
+      }
+    }
+
     const index = this.userRepo.getNextDerivationIndex();
     const address = await this.walletManager.deriveAddress(index);
     return this.userRepo.create(twitterUserId, twitterUsername, index, address);
   }
 
   async ensureUserByUsername(twitterUsername: string): Promise<User> {
+    // Check for existing account by username
     const existing = this.userRepo.findByUsername(twitterUsername);
     if (existing) return existing;
 
+    // Check for a pending account that was already created for this username
+    const pending = this.userRepo.findByTwitterId(
+      `pending_${twitterUsername.toLowerCase()}`
+    );
+    if (pending) return pending;
+
+    // Check all users in case the account exists but username wasn't set
+    // (e.g., created via DM where username is empty)
+    const allUsers = this.userRepo.getAll();
+    for (const user of allUsers) {
+      if (
+        user.twitter_username &&
+        user.twitter_username.toLowerCase() === twitterUsername.toLowerCase()
+      ) {
+        return user;
+      }
+    }
+
     // Create a placeholder user — we don't have their twitter_user_id yet.
-    // Use the username as a temporary ID; it'll be updated when they interact.
     const index = this.userRepo.getNextDerivationIndex();
     const address = await this.walletManager.deriveAddress(index);
     return this.userRepo.create(
