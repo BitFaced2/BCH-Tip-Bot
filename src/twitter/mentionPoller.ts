@@ -1,6 +1,8 @@
 import type { TwitterApi } from "twitter-api-v2";
 import { PollStateRepository } from "../db/repositories/pollStateRepository.js";
+import { TipRepository } from "../db/repositories/tipRepository.js";
 import type { CommandContext } from "../types/index.js";
+import type Database from "better-sqlite3";
 import pino from "pino";
 
 const logger = pino({ name: "mention-poller" });
@@ -8,6 +10,7 @@ const logger = pino({ name: "mention-poller" });
 export class MentionPoller {
   private timer: ReturnType<typeof setInterval> | null = null;
   private pollState: PollStateRepository;
+  private tipRepo: TipRepository;
 
   constructor(
     private client: TwitterApi,
@@ -15,9 +18,11 @@ export class MentionPoller {
     private botUsername: string,
     private pollIntervalMs: number,
     private onCommand: (ctx: CommandContext) => Promise<void>,
-    pollState: PollStateRepository
+    pollState: PollStateRepository,
+    db: Database.Database
   ) {
     this.pollState = pollState;
+    this.tipRepo = new TipRepository(db);
   }
 
   start(): void {
@@ -69,6 +74,10 @@ export class MentionPoller {
 
         // Skip tweets from the bot itself
         if (tweet.author_id === this.botUserId) continue;
+
+        // Skip tweets we've already processed (search API can return duplicates)
+        if (sinceId && tweet.id <= sinceId) continue;
+        if (this.tipRepo.findByTweetId(tweet.id)) continue;
 
         const ctx: CommandContext = {
           type: "mention",

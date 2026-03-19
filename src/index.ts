@@ -78,7 +78,8 @@ async function main(): Promise<void> {
     "bchtip",
     config.pollIntervalMs,
     (ctx) => commandRouter.route(ctx),
-    pollState
+    pollState,
+    db
   );
 
   const dmPoller = new DMPoller(
