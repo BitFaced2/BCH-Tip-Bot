@@ -44,7 +44,7 @@ export class MentionPoller {
       const sinceId = this.pollState.get("last_mention_id");
 
       const params: Record<string, any> = {
-        "tweet.fields": ["author_id", "created_at", "text"],
+        "tweet.fields": ["author_id", "created_at", "text", "note_tweet"],
         "user.fields": ["username"],
         expansions: ["author_id"],
         max_results: 100,
@@ -83,7 +83,7 @@ export class MentionPoller {
           type: "mention",
           senderTwitterId: tweet.author_id!,
           senderUsername: username,
-          text: tweet.text,
+          text: tweet.note_tweet?.text ?? tweet.text,
           tweetId: tweet.id,
         };
 
