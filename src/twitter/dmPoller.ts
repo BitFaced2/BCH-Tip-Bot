@@ -61,10 +61,19 @@ export class DMPoller {
         if (event.event_type !== "MessageCreate") continue;
         if (event.sender_id === this.botUserId) continue;
 
+        // Look up username from X API since DMs don't include it
+        let senderUsername = "";
+        try {
+          const userLookup = await this.client.v2.user(event.sender_id!);
+          senderUsername = userLookup.data?.username ?? "";
+        } catch (err) {
+          logger.warn({ err, senderId: event.sender_id }, "Failed to look up DM sender username");
+        }
+
         const ctx: CommandContext = {
           type: "dm",
           senderTwitterId: event.sender_id!,
-          senderUsername: "", // DMs don't include username — will be resolved by command handler
+          senderUsername,
           text: event.text ?? "",
         };
 
