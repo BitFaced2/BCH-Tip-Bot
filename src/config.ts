@@ -28,7 +28,7 @@ export const config = {
   // Bot Configuration
   pollIntervalMs: parseInt(optional("POLL_INTERVAL_MS", "15000"), 10),
   requiredConfirmations: parseInt(optional("REQUIRED_CONFIRMATIONS", "3"), 10),
-  minTipSatoshis: parseInt(optional("MIN_TIP_SATOSHIS", "1000"), 10),
+  minTipSatoshis: parseInt(optional("MIN_TIP_SATOSHIS", "100"), 10),
   minWithdrawalSatoshis: parseInt(optional("MIN_WITHDRAWAL_SATOSHIS", "10000"), 10),
   maxWithdrawalSatoshis: parseInt(optional("MAX_WITHDRAWAL_SATOSHIS", "100000000"), 10),
   withdrawalFeeSatoshis: parseInt(optional("WITHDRAWAL_FEE_SATOSHIS", "500"), 10),
