@@ -16,6 +16,12 @@ export class TipRepository {
       .get(tweetId) as Tip | undefined;
   }
 
+  findByTweetIdAndRecipient(tweetId: string, toUserId: number): Tip | undefined {
+    return this.db
+      .prepare("SELECT * FROM tips WHERE tweet_id = ? AND to_user_id = ?")
+      .get(tweetId, toUserId) as Tip | undefined;
+  }
+
   create(
     fromUserId: number,
     toUserId: number,

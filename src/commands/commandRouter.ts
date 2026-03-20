@@ -8,8 +8,8 @@ import pino from "pino";
 
 const logger = pino({ name: "command-router" });
 
-// Matches: tip @username 0.001 BCH (with optional leading @botname)
-const TIP_REGEX = /tip\s+@(\w{1,15})\s+([\d.]+)\s*BCH/i;
+// Matches: tip @user1 @user2 ... 0.001 BCH (one or more recipients)
+const TIP_REGEX = /tip\s+((?:@\w{1,15}\s+)+)([\d.]+)\s*BCH/i;
 
 // DM commands
 const DM_PATTERNS = {
@@ -37,13 +37,13 @@ export class CommandRouter {
       // Only look for tip commands in mentions
       const tipMatch = text.match(TIP_REGEX);
       if (tipMatch) {
-        const recipientUsername = tipMatch[1];
+        const usernames = tipMatch[1].match(/@(\w{1,15})/g)!.map(u => u.slice(1));
         const amount = tipMatch[2];
         logger.info(
-          { sender: ctx.senderUsername, recipient: recipientUsername, amount },
+          { sender: ctx.senderUsername, recipients: usernames, amount },
           "Tip command"
         );
-        await this.handlers.tip.execute(ctx, recipientUsername, amount);
+        await this.handlers.tip.execute(ctx, usernames, amount);
         return;
       }
 

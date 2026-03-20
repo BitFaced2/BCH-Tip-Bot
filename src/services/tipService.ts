@@ -121,14 +121,6 @@ export class TipService {
     amountBch: number,
     tweetId: string | null
   ): Promise<TipResult> {
-    // Check idempotency
-    if (tweetId) {
-      const existing = this.tipRepo.findByTweetId(tweetId);
-      if (existing) {
-        return { success: false, error: "This tip has already been processed." };
-      }
-    }
-
     const amountSatoshis = bchToSatoshis(amountBch);
 
     if (amountSatoshis < this.minTipSatoshis) {
@@ -138,8 +130,11 @@ export class TipService {
       };
     }
 
-    const feeSatoshis = Math.floor(amountSatoshis * (this.tipFeePercent / 100));
-    const recipientReceived = amountSatoshis - feeSatoshis;
+    // Only charge fee if a fee account is configured, otherwise fee is zero
+    const feeSatoshis = this.feeUserId
+      ? Math.floor(amountSatoshis * (this.tipFeePercent / 100))
+      : 0;
+    const totalCost = amountSatoshis + feeSatoshis;
 
     const sender = await this.ensureUser(senderTwitterId, senderUsername);
 
@@ -150,11 +145,19 @@ export class TipService {
 
     const recipient = await this.ensureUserByUsername(recipientUsername);
 
-    // Transfer in a single transaction
+    // Check idempotency per recipient (supports multi-tip tweets)
+    if (tweetId) {
+      const existing = this.tipRepo.findByTweetIdAndRecipient(tweetId, recipient.id);
+      if (existing) {
+        return { success: false, error: "This tip has already been processed." };
+      }
+    }
+
+    // Transfer — sender pays amount + fee, recipient gets full amount
     const transferred = this.balanceService.transfer(
       sender.id,
       recipient.id,
-      amountSatoshis,
+      totalCost,
       feeSatoshis,
       this.feeUserId
     );
@@ -187,7 +190,7 @@ export class TipService {
       recipient: updatedRecipient,
       amountSatoshis,
       feeSatoshis,
-      recipientReceived,
+      recipientReceived: amountSatoshis,
     };
   }
 }

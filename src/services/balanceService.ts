@@ -94,6 +94,7 @@ export class BalanceService {
         recipient.balance_satoshis + recipientAmount
       );
 
+
       // Credit fees to the fee account if configured
       if (feeUserId && feeSatoshis > 0) {
         const feeUser = this.userRepo.findById(feeUserId);

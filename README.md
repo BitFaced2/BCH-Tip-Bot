@@ -11,13 +11,15 @@ Mention the bot in a tweet or reply:
 `@bchtip tip @username 0.001 BCH`
 
 **Can I tip multiple people in one tweet?**
-No. The bot processes one tip per tweet. If you want to tip multiple people, send a separate tweet or reply for each one. This will probably be an added feature in the future.
+Yes! List multiple usernames before the amount (up to 5 per tweet):
+`@bchtip tip @user1 @user2 @user3 0.001 BCH`
+Each person receives the full 0.001 BCH. Note: all recipients get the same amount. You cannot specify different amounts per person — only the first tip command in a tweet is processed.
 
 **What's the minimum tip amount?**
 100 satoshis (0.000001 BCH).
 
 **Is there a fee for tipping?**
-A 1% fee is deducted from each tip. This is to cover server costs.
+A 1% fee is added on top of each tip to cover server costs. The recipient receives the full tip amount. When tipping multiple people, the fee is charged per recipient.
 
 **Do I need an account to receive tips?**
 No. If someone tips you and you don't have an account yet, one is created automatically. DM the bot to access your funds.
