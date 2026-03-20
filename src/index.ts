@@ -85,7 +85,7 @@ async function main(): Promise<void> {
   const dmPoller = new DMPoller(
     twitterClient,
     config.twitterBotUserId,
-    30_000, // Poll DMs every 30 seconds — DMs are infrequent so cost is minimal
+    90_000, // Poll DMs every 90 seconds to avoid rate limiting
     (ctx) => commandRouter.route(ctx),
     pollState
   );
