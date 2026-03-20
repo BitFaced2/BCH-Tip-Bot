@@ -47,12 +47,8 @@ export class CommandRouter {
         return;
       }
 
-      // Also support DM-style commands in mentions as fallback
-      const dmMatch = this.matchDMCommand(text);
-      if (dmMatch) {
-        await this.executeDMCommand(dmMatch.command, dmMatch.args, ctx);
-        return;
-      }
+      // Ignore DM-style commands in public mentions (deposit, balance, etc.)
+      // These should only be used via DM for privacy.
     }
 
     if (ctx.type === "dm") {
