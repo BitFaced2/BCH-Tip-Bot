@@ -52,14 +52,16 @@ export class TipCommand {
     const recipientIsNew =
       result.recipient!.twitter_user_id.startsWith("pending_");
 
-    let message = `Tipped @${recipientUsername} ${formatBch(result.recipientReceived!)} BCH!`;
+    let message = "";
+
+    if (recipientIsNew) {
+      message += `Welcome to BCH Tip Bot! DM me "help" to get started.\n`;
+    }
+
+    message += `Tipped @${recipientUsername} ${formatBch(result.recipientReceived!)} BCH!`;
 
     if (result.feeSatoshis! > 0) {
       message += ` (fee: ${formatBch(result.feeSatoshis!)} BCH)`;
-    }
-
-    if (recipientIsNew) {
-      message += ` DM me "help" to learn how to use it.`;
     }
 
     await this.responder.replyToTweet(ctx.tweetId!, message);
