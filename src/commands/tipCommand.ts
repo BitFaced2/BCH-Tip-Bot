@@ -59,7 +59,7 @@ export class TipCommand {
     }
 
     if (recipientIsNew) {
-      message += `\n\n@${recipientUsername} You received a BCH tip! DM me "help" to learn how to use it.`;
+      message += ` DM me "help" to learn how to use it.`;
     }
 
     await this.responder.replyToTweet(ctx.tweetId!, message);
