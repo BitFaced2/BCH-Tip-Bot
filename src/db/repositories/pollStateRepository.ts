@@ -11,6 +11,14 @@ export class PollStateRepository {
     return row?.value;
   }
 
+  getWithAge(key: string): { value: string; updatedAt: string } | undefined {
+    const row = this.db
+      .prepare("SELECT value, updated_at FROM poll_state WHERE key = ?")
+      .get(key) as PollState | undefined;
+    if (!row) return undefined;
+    return { value: row.value, updatedAt: row.updated_at };
+  }
+
   set(key: string, value: string): void {
     this.db
       .prepare(

@@ -38,7 +38,15 @@ export class MentionPoller {
 
   private async poll(): Promise<void> {
     try {
-      const sinceId = this.pollState.get("last_mention_id");
+      // X's search API rejects since_id values from tweets older than ~7 days.
+      // If our stored since_id is approaching that window, skip it so the next
+      // successful response refreshes the value naturally.
+      const stored = this.pollState.getWithAge("last_mention_id");
+      const STALE_MS = 6 * 24 * 60 * 60 * 1000;
+      const isStale = stored
+        ? Date.now() - new Date(stored.updatedAt.replace(" ", "T") + "Z").getTime() > STALE_MS
+        : false;
+      const sinceId = stored && !isStale ? stored.value : undefined;
 
       const params: Record<string, any> = {
         "tweet.fields": ["author_id", "created_at", "text", "note_tweet"],
