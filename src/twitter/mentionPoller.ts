@@ -103,9 +103,26 @@ export class MentionPoller {
     } catch (err: any) {
       if (err?.code === 429) {
         logger.warn("Rate limited on search endpoint, backing off");
-      } else {
-        logger.error({ err }, "Error polling mentions");
+        return;
       }
+
+      // X rejects since_id values pointing to tweets older than ~7 days.
+      // Parse the threshold tweet ID from the error and advance past it so
+      // the next poll succeeds without losing the dedup guard.
+      const sinceIdError = err?.data?.errors?.find(
+        (e: any) => e?.parameters?.since_id
+      );
+      if (err?.code === 400 && sinceIdError) {
+        const match = /larger than (\d+)/.exec(sinceIdError.message ?? "");
+        if (match) {
+          const threshold = match[1];
+          logger.warn({ threshold }, "since_id stale, advancing past 7-day window");
+          this.pollState.set("last_mention_id", threshold);
+          return;
+        }
+      }
+
+      logger.error({ err }, "Error polling mentions");
     }
   }
 }
