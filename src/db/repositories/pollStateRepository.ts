@@ -28,4 +28,8 @@ export class PollStateRepository {
       )
       .run(key, value, value);
   }
+
+  delete(key: string): void {
+    this.db.prepare("DELETE FROM poll_state WHERE key = ?").run(key);
+  }
 }
