@@ -59,11 +59,22 @@ export class MentionPoller {
       }
 
       // Use search endpoint instead of mentions timeline
-      // This catches @bchtip mentions in replies, quote tweets, and standalone posts
-      const result = await this.client.v2.search(
-        `@${this.botUsername} -from:${this.botUsername}`,
-        params
-      );
+      // This catches @bchtip mentions in replies, quote tweets, and standalone posts.
+      // twitter-api-v2 has no built-in request timeout, so race against one to
+      // prevent a hung socket from silently stalling the poller indefinitely.
+      const SEARCH_TIMEOUT_MS = 60_000;
+      const result = await Promise.race([
+        this.client.v2.search(
+          `@${this.botUsername} -from:${this.botUsername}`,
+          params
+        ),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`Mention search timed out after ${SEARCH_TIMEOUT_MS}ms`)),
+            SEARCH_TIMEOUT_MS
+          )
+        ),
+      ]);
 
       const tweets = result.data?.data;
       if (!tweets || tweets.length === 0) return;
