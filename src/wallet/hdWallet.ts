@@ -1,4 +1,5 @@
 import { Wallet, TestNetWallet } from "mainnet-js";
+import { withTimeout } from "../utils/withTimeout.js";
 
 export class HDWalletManager {
   private mnemonic: string = "";
@@ -47,7 +48,7 @@ export class HDWalletManager {
 
   async getBalance(index: number): Promise<bigint> {
     const wallet = await this.getWalletForIndex(index);
-    const balance = await wallet.getBalance();
+    const balance = await withTimeout(wallet.getBalance(), 30_000, `getBalance(${index})`);
     return typeof balance === "bigint" ? balance : BigInt(Math.round(Number(balance)));
   }
 
@@ -57,9 +58,11 @@ export class HDWalletManager {
     amountSatoshis: number
   ): Promise<string> {
     const wallet = await this.getWalletForIndex(fromIndex);
-    const response = await wallet.send([
-      { cashaddr: toAddress, value: BigInt(amountSatoshis) },
-    ]);
+    const response = await withTimeout(
+      wallet.send([{ cashaddr: toAddress, value: BigInt(amountSatoshis) }]),
+      90_000,
+      `send(${fromIndex})`
+    );
     return response.txId!;
   }
 
@@ -76,7 +79,11 @@ export class HDWalletManager {
 
     const hotWallet = await this.getHotWallet();
     const wallet = await this.getWalletForIndex(fromIndex);
-    const response = await wallet.sendMax(hotWallet.cashaddr!);
+    const response = await withTimeout(
+      wallet.sendMax(hotWallet.cashaddr!),
+      90_000,
+      `sweepToHotWallet(${fromIndex})`
+    );
     return response.txId!;
   }
 }

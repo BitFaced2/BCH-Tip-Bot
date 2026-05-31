@@ -2,6 +2,7 @@ import type { TwitterApi } from "twitter-api-v2";
 import { PollStateRepository } from "../db/repositories/pollStateRepository.js";
 import type { CommandContext } from "../types/index.js";
 import type Database from "better-sqlite3";
+import { withTimeout } from "../utils/withTimeout.js";
 import pino from "pino";
 
 const logger = pino({ name: "mention-poller" });
@@ -24,7 +25,7 @@ export class MentionPoller {
 
   start(): void {
     logger.info("Starting mention poller");
-    this.poll();
+    this.poll().catch((err) => logger.error({ err }, "Initial mention poll failed"));
     this.timer = setInterval(() => this.poll(), this.pollIntervalMs);
   }
 
@@ -58,23 +59,16 @@ export class MentionPoller {
         params.since_id = sinceId;
       }
 
-      // Use search endpoint instead of mentions timeline
-      // This catches @bchtip mentions in replies, quote tweets, and standalone posts.
-      // twitter-api-v2 has no built-in request timeout, so race against one to
+      // twitter-api-v2 has no built-in request timeout, so wrap the call to
       // prevent a hung socket from silently stalling the poller indefinitely.
-      const SEARCH_TIMEOUT_MS = 60_000;
-      const result = await Promise.race([
+      const result = await withTimeout(
         this.client.v2.search(
           `@${this.botUsername} -from:${this.botUsername}`,
           params
         ),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error(`Mention search timed out after ${SEARCH_TIMEOUT_MS}ms`)),
-            SEARCH_TIMEOUT_MS
-          )
-        ),
-      ]);
+        60_000,
+        "mention search"
+      );
 
       const tweets = result.data?.data;
       if (!tweets || tweets.length === 0) return;

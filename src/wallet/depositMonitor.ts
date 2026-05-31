@@ -5,6 +5,7 @@ import { BalanceService } from "../services/balanceService.js";
 import { HDWalletManager } from "./hdWallet.js";
 import { Responder } from "../twitter/responder.js";
 import { formatBch } from "../utils/satoshiConversion.js";
+import { withTimeout } from "../utils/withTimeout.js";
 import pino from "pino";
 
 const logger = pino({ name: "deposit-monitor" });
@@ -29,7 +30,9 @@ export class DepositMonitor {
 
   start(): void {
     logger.info("Starting deposit monitor");
-    this.checkDeposits();
+    this.checkDeposits().catch((err) =>
+      logger.error({ err }, "Initial deposit check failed")
+    );
     this.timer = setInterval(
       () => this.checkDeposits(),
       this.pollIntervalMs
@@ -71,7 +74,11 @@ export class DepositMonitor {
         const wallet = await this.walletManager.getWalletForIndex(
           user.derivation_index
         );
-        const history = await wallet.getHistory();
+        const history = await withTimeout(
+          wallet.getHistory(),
+          30_000,
+          `scan getHistory(${user.derivation_index})`
+        );
 
         if (!history || !Array.isArray(history)) continue;
 
@@ -134,7 +141,11 @@ export class DepositMonitor {
         );
 
         // Get transaction history and find our tx by hash
-        const history = await wallet.getHistory();
+        const history = await withTimeout(
+          wallet.getHistory(),
+          30_000,
+          `confirm getHistory(${user.derivation_index})`
+        );
         if (!history || !Array.isArray(history)) continue;
 
         const matchingTx = history.find(
@@ -146,7 +157,11 @@ export class DepositMonitor {
         let confirmations = 0;
         if (matchingTx.blockHeight && matchingTx.blockHeight > 0) {
           // Get current blockchain tip height
-          const currentHeight = await wallet.provider!.getBlockHeight();
+          const currentHeight = await withTimeout(
+            wallet.provider!.getBlockHeight(),
+            30_000,
+            "getBlockHeight"
+          );
 
           if (currentHeight > 0) {
             confirmations = currentHeight - matchingTx.blockHeight + 1;

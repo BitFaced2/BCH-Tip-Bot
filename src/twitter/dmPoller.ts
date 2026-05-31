@@ -1,6 +1,7 @@
 import type { TwitterApi } from "twitter-api-v2";
 import { PollStateRepository } from "../db/repositories/pollStateRepository.js";
 import type { CommandContext } from "../types/index.js";
+import { withTimeout } from "../utils/withTimeout.js";
 import pino from "pino";
 
 const logger = pino({ name: "dm-poller" });
@@ -22,7 +23,7 @@ export class DMPoller {
 
   start(): void {
     logger.info("Starting DM poller");
-    this.poll();
+    this.poll().catch((err) => logger.error({ err }, "Initial DM poll failed"));
     this.timer = setInterval(() => this.poll(), this.pollIntervalMs);
   }
 
@@ -41,11 +42,15 @@ export class DMPoller {
     }
 
     try {
-      const paginator = await this.client.v2.listDmEvents({
-        "dm_event.fields": ["id", "text", "sender_id", "created_at", "event_type"],
-        event_types: "MessageCreate",
-        max_results: 100,
-      });
+      const paginator = await withTimeout(
+        this.client.v2.listDmEvents({
+          "dm_event.fields": ["id", "text", "sender_id", "created_at", "event_type"],
+          event_types: "MessageCreate",
+          max_results: 100,
+        }),
+        60_000,
+        "DM listEvents"
+      );
 
       const events = paginator.data?.data;
       if (!events || events.length === 0) return;
@@ -64,7 +69,11 @@ export class DMPoller {
         // Look up username from X API since DMs don't include it
         let senderUsername = "";
         try {
-          const userLookup = await this.client.v2.user(event.sender_id!);
+          const userLookup = await withTimeout(
+            this.client.v2.user(event.sender_id!),
+            30_000,
+            "DM sender lookup"
+          );
           senderUsername = userLookup.data?.username ?? "";
         } catch (err) {
           logger.warn({ err, senderId: event.sender_id }, "Failed to look up DM sender username");
