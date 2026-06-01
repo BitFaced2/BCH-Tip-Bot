@@ -58,8 +58,11 @@ export class CommandRouter {
         return;
       }
 
-      // Unknown command — send help
-      await this.handlers.help.execute(ctx);
+      // Silently ignore unknown DMs. Auto-replying with help to anything that
+      // doesn't match a command engages spam/AI bots in a tight loop, and the
+      // resulting flood of DM events flushes real users' messages out of X's
+      // listDmEvents window before the poller can see them. Real users who
+      // DM "help" still get a reply via the explicit pattern above.
     }
   }
 
