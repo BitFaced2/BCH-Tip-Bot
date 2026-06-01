@@ -125,14 +125,29 @@ export class WithdrawCommand {
           `Fee: ${formatBch(this.withdrawalFeeSatoshis)} BCH`
       );
     } catch (err) {
-      // Refund on failure
-      logger.error({ err, userId: user.id }, "Withdrawal failed, refunding");
-      this.balanceService.credit(user.id, totalDebit);
-      this.transactionRepo.updateStatus(txRecord.id, "failed");
+      // Do NOT auto-refund: an error from send() does not prove the TX wasn't
+      // broadcast (timeouts and network errors can fire after the broadcast
+      // already left the wire). Refunding here would double-spend against the
+      // hot wallet. Leave the row pending with no txid; admin checks the
+      // chain and either marks it confirmed or refunds manually.
+      logger.error(
+        {
+          err,
+          userId: user.id,
+          txRecordId: txRecord.id,
+          address: normalizedAddress,
+          amountSatoshis,
+          totalDebit,
+        },
+        "WITHDRAWAL UNCERTAIN — manual review required"
+      );
 
       await this.responder.sendDM(
         ctx.senderTwitterId,
-        "Withdrawal failed. Your balance has been restored. Please try again later."
+        "Your withdrawal could not be confirmed automatically and is under " +
+          "review. Your balance has NOT been restored yet — this prevents a " +
+          "double-spend if the transaction actually went through. " +
+          "An admin will resolve this and contact you. Please do not retry."
       );
     }
   }
