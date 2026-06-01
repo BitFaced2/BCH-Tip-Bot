@@ -12,6 +12,7 @@ const logger = pino({ name: "deposit-monitor" });
 
 export class DepositMonitor {
   private timer: ReturnType<typeof setInterval> | null = null;
+  private running = false;
   private userRepo: UserRepository;
   private transactionRepo: TransactionRepository;
   private balanceService: BalanceService;
@@ -48,6 +49,15 @@ export class DepositMonitor {
   }
 
   private async checkDeposits(): Promise<void> {
+    // Skip if a previous cycle is still running. mainnet-js rejects concurrent
+    // ops on the same Wallet ("existing connection exists"), and an N-user
+    // scan can outrun the poll interval — letting cycles stack would create
+    // socket contention and duplicate work.
+    if (this.running) {
+      logger.warn("Previous deposit check still running, skipping this tick");
+      return;
+    }
+    this.running = true;
     try {
       // Check for new deposits on all user addresses
       await this.scanForNewDeposits();
@@ -56,6 +66,8 @@ export class DepositMonitor {
       await this.updatePendingConfirmations();
     } catch (err) {
       logger.error({ err }, "Error checking deposits");
+    } finally {
+      this.running = false;
     }
   }
 
