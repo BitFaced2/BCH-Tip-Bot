@@ -188,9 +188,16 @@ export class DepositMonitor {
           confirmations >= this.requiredConfirmations &&
           tx.status !== "confirmed"
         ) {
-          // Credit the user's balance
-          this.balanceService.credit(tx.user_id, tx.amount_satoshis);
-          this.transactionRepo.updateStatus(tx.id, "confirmed");
+          // Atomically mark the row confirmed AND credit the balance, so a
+          // crash or concurrent poll between the two writes can't double-credit
+          // or leave a credited-but-unconfirmed row.
+          const credited = this.db.transaction((): boolean => {
+            if (!this.transactionRepo.tryMarkConfirmed(tx.id)) return false;
+            this.balanceService.credit(tx.user_id, tx.amount_satoshis);
+            return true;
+          }).immediate();
+
+          if (!credited) continue;
 
           logger.info(
             {

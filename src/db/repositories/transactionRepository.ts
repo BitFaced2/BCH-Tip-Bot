@@ -49,6 +49,18 @@ export class TransactionRepository {
       .run(status, id);
   }
 
+  // Atomically mark a deposit confirmed only if it isn't already. Returns true
+  // when the row was actually changed, so callers can gate one-shot side effects
+  // (e.g. crediting a balance) on the winning update.
+  tryMarkConfirmed(id: number): boolean {
+    const result = this.db
+      .prepare(
+        "UPDATE transactions SET status = 'confirmed', updated_at = datetime('now') WHERE id = ? AND status != 'confirmed'"
+      )
+      .run(id);
+    return result.changes > 0;
+  }
+
   updateConfirmations(id: number, confirmations: number): void {
     this.db
       .prepare(
