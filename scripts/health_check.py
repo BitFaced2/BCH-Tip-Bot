@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Daily health check for BCH Tip Bot — runs on the local PC, SSHes into
-qube.cash to gather signals, emails on issues via Gmail SMTP (mirrors the
+qube.cash to gather signals, emails a digest via Gmail SMTP (mirrors the
 qube_stats.py pattern, which works around DO's outbound-SMTP block).
+
+Always sends an email: "Daily Health Check OK" when everything passes,
+or a flagged issues list when something looks off.
 
 Schedule alongside qube_stats.py in Windows Task Scheduler.
 
@@ -190,8 +193,6 @@ def send_email(subject: str, body: str) -> bool:
 
 
 def main() -> int:
-    force = "--force" in sys.argv
-
     issues: list[str] = []
 
     try:
@@ -211,17 +212,15 @@ def main() -> int:
     except Exception as e:
         issues.append(f"Health check error: {e}")
 
-    if not issues and not force:
-        return 0
-
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    today = datetime.now().strftime("%Y-%m-%d")
     if issues:
-        subject = f"[BCH Tip Bot] Health check found {len(issues)} issue(s)"
+        subject = f"[BCH Tip Bot] Health check found {len(issues)} issue(s) - {today}"
         body_lines = [f"Health check at {now}", "", "Issues:"]
         for i in issues:
             body_lines.append(i if i.startswith("  ") else f"  - {i}")
     else:
-        subject = f"[BCH Tip Bot] Health check OK - {datetime.now().strftime('%Y-%m-%d')}"
+        subject = f"[BCH Tip Bot] Daily Health Check OK - {today}"
         body_lines = [f"Health check at {now}", "", "All checks passed."]
 
     body = "\n".join(body_lines)
