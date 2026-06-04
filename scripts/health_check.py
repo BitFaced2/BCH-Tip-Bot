@@ -182,7 +182,11 @@ def send_email(subject: str, body: str) -> bool:
     msg.attach(MIMEText(html, "html"))
 
     try:
-        with smtplib.SMTP(EMAIL_CONFIG["smtp_server"], EMAIL_CONFIG["smtp_port"]) as srv:
+        # Without an explicit timeout smtplib will wait forever on a hung
+        # socket — that's how yesterday's run produced no email at all.
+        with smtplib.SMTP(
+            EMAIL_CONFIG["smtp_server"], EMAIL_CONFIG["smtp_port"], timeout=30
+        ) as srv:
             srv.starttls()
             srv.login(EMAIL_CONFIG["sender_email"], EMAIL_CONFIG["sender_password"])
             srv.send_message(msg)
