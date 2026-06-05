@@ -11,7 +11,10 @@ export class HelpCommand {
     const message = [
       `BCH Tip Bot Commands:`,
       ``,
-      `DM Commands:`,
+      `Web (recommended): https://tipbot.qube.cash`,
+      `  Sign in with X to view balance, deposit address, and withdraw.`,
+      ``,
+      `DM Commands (may fail for encrypted DMs):`,
       `  deposit - Get your BCH deposit address`,
       `  balance - Check your current balance`,
       `  withdraw <amount> <address> - Withdraw BCH`,

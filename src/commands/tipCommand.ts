@@ -93,7 +93,7 @@ export class TipCommand {
     if (tipped.length === 0) {
       await this.responder.replyToTweet(
         ctx.tweetId!,
-        `Could not send tips. Check your balance by DMing me "balance".`
+        `Could not send tips. Check your balance at https://tipbot.qube.cash`
       );
       return;
     }
@@ -101,7 +101,7 @@ export class TipCommand {
     let message = "";
 
     if (welcomed.length > 0) {
-      message += `Welcome to BCH Tip Bot! DM me "help" to get started.\n`;
+      message += `Welcome to BCH Tip Bot! Manage your balance at https://tipbot.qube.cash\n`;
     }
 
     const each = tipped.length > 1 ? " each" : "";

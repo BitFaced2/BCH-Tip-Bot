@@ -41,7 +41,7 @@ export class WithdrawCommand {
     if (ctx.type !== "dm") {
       await this.responder.replyToTweet(
         ctx.tweetId!,
-        "Please DM me your withdrawal request for security."
+        "Withdraw at https://tipbot.qube.cash (sign in with X), or DM me \"withdraw <amount> <address>\"."
       );
       return;
     }
