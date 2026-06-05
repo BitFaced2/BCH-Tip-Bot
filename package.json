@@ -6,20 +6,27 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
+    "build:web": "tsc -p tsconfig.web.json",
     "start": "node dist/index.js",
+    "start:web": "node dist-web/server.js",
     "dev": "tsx src/index.ts",
+    "dev:web": "tsx web/server.ts",
     "test": "vitest"
   },
   "license": "MIT",
   "dependencies": {
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.3.1",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
     "mainnet-js": "^3.1.7",
     "pino": "^10.3.1",
     "twitter-api-v2": "^1.29.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/express": "^4.17.21",
     "@types/node": "^25.3.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
