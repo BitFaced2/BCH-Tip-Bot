@@ -4,7 +4,12 @@ import { config } from "./config.js";
 // X OAuth 2.0 with PKCE. Only the bits we need: build the auth-redirect URL,
 // exchange the callback `code` for an access token, fetch the signed-in user.
 
-const AUTHORIZE_URL = "https://twitter.com/i/oauth2/authorize";
+// X has been migrating twitter.com → x.com. The /i/oauth2/authorize page on
+// twitter.com redirects mid-flow to x.com and loses session cookies, causing
+// an infinite "you must be logged in to X" loop. Point at x.com directly.
+// The token and users/me endpoints don't render UI so they stay on
+// api.twitter.com for now (still the documented URL).
+const AUTHORIZE_URL = "https://x.com/i/oauth2/authorize";
 const TOKEN_URL = "https://api.twitter.com/2/oauth2/token";
 const ME_URL = "https://api.twitter.com/2/users/me";
 
