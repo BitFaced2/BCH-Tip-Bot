@@ -9,18 +9,12 @@ export class HelpCommand {
 
   async execute(ctx: CommandContext): Promise<void> {
     const message = [
-      `BCH Tip Bot Commands:`,
+      `BCH Tip Bot`,
       ``,
-      `Web (recommended): https://tipbot.qube.cash`,
-      `  Sign in with X to view balance, deposit address, and withdraw.`,
+      `Manage your balance, deposit address, and withdrawals at:`,
+      `https://tipbot.qube.cash (sign in with X)`,
       ``,
-      `DM Commands (may fail for encrypted DMs):`,
-      `  deposit - Get your BCH deposit address`,
-      `  balance - Check your current balance`,
-      `  withdraw <amount> <address> - Withdraw BCH`,
-      `  help - Show this message`,
-      ``,
-      `Public Commands (reply to a tweet):`,
+      `Send a tip in a public tweet:`,
       `  @${this.botUsername} tip @user <amount> BCH`,
       ``,
       `Example: @${this.botUsername} tip @alice 0.001 BCH`,

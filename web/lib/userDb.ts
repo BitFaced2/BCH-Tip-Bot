@@ -143,3 +143,25 @@ export function queueWithdrawal(
   txn.immediate();
   return result;
 }
+
+export interface HistoryRow {
+  id: number;
+  type: "deposit" | "withdrawal";
+  amount_satoshis: number;
+  address: string | null;
+  txid: string | null;
+  status: string;
+  created_at: string;
+}
+
+export function getRecentTransactions(userId: number, limit: number): HistoryRow[] {
+  return db()
+    .prepare(
+      `SELECT id, type, amount_satoshis, address, txid, status, created_at
+         FROM transactions
+        WHERE user_id = ?
+        ORDER BY id DESC
+        LIMIT ?`
+    )
+    .all(userId, limit) as HistoryRow[];
+}

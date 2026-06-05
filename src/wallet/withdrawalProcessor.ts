@@ -3,8 +3,6 @@ import { UserRepository } from "../db/repositories/userRepository.js";
 import { TransactionRepository } from "../db/repositories/transactionRepository.js";
 import { BalanceService } from "../services/balanceService.js";
 import { HDWalletManager } from "./hdWallet.js";
-import { Responder } from "../twitter/responder.js";
-import { formatBch } from "../utils/satoshiConversion.js";
 import pino from "pino";
 
 const logger = pino({ name: "withdrawal-processor" });
@@ -32,7 +30,6 @@ export class WithdrawalProcessor {
   constructor(
     private db: Database.Database,
     private walletManager: HDWalletManager,
-    private responder: Responder,
     private withdrawalFeeSatoshis: number,
     private pollIntervalMs: number
   ) {
@@ -106,11 +103,6 @@ export class WithdrawalProcessor {
         "Queued withdrawal failed — insufficient balance at process time"
       );
       this.transactionRepo.updateStatus(txId, "failed");
-      await this.notifyUser(
-        tx.user_id,
-        "Your queued withdrawal could not be processed because your balance is no longer sufficient. " +
-          "No funds were debited."
-      );
       return;
     }
 
@@ -131,34 +123,14 @@ export class WithdrawalProcessor {
         },
         "WITHDRAWAL UNCERTAIN — manual review required"
       );
-      await this.notifyUser(
-        tx.user_id,
-        "Your withdrawal could not be confirmed automatically and is under review. " +
-          "Your balance has NOT been restored yet — this prevents a double-spend if the transaction " +
-          "actually went through. An admin will resolve this."
-      );
       return;
     }
 
     this.transactionRepo.updateTxid(txId, txid);
     this.transactionRepo.updateStatus(txId, "confirmed");
     logger.info({ txId, userId: tx.user_id, txid }, "Withdrawal sent");
-    await this.notifyUser(
-      tx.user_id,
-      `Withdrawal of ${formatBch(tx.amount_satoshis)} BCH sent!\n` +
-        `TX: https://blockchair.com/bitcoin-cash/transaction/${txid}\n` +
-        `Fee: ${formatBch(this.withdrawalFeeSatoshis)} BCH`
-    );
-  }
-
-  private async notifyUser(userId: number, message: string): Promise<void> {
-    const user = this.userRepo.findById(userId);
-    if (!user) return;
-    if (user.twitter_user_id.startsWith("pending_")) return;
-    try {
-      await this.responder.sendDM(user.twitter_user_id, message);
-    } catch (err) {
-      logger.warn({ err, userId }, "Failed to notify withdrawal outcome via DM");
-    }
+    // User-facing outcome (success/failed/review) is reflected on
+    // https://tipbot.qube.cash — we no longer DM because DMs are unreliable
+    // under X's E2E rollout.
   }
 }

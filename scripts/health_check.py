@@ -39,8 +39,10 @@ EMAIL_CONFIG = {
 # above X's 7-day since_id window so a quiet stretch where the bot's own
 # reactive handler clears the row doesn't trigger noise; if mentions are
 # legitimately silent for >8d, that's worth knowing.
+#
+# The DM poller is no longer started (X's E2E rollout made DMs unreliable),
+# so its last_dm_event_id naturally goes stale forever. We don't check it.
 MENTION_POLLER_STALE_DAYS = 8
-DM_POLLER_STALE_HOURS = 48
 STUCK_WITHDRAWAL_MIN_MINUTES = 60
 DISK_USAGE_ALERT_PCT = 95
 RECENT_ERROR_THRESHOLD = 100
@@ -96,14 +98,6 @@ def check_poll_state() -> list[str]:
             issues.append(
                 f"Mention poller stale: last_mention_id updated {age_days:.1f}d ago "
                 f"(threshold {MENTION_POLLER_STALE_DAYS}d)"
-            )
-
-    if "last_dm_event_id" in state:
-        age_hours = (now - state["last_dm_event_id"]).total_seconds() / 3600
-        if age_hours > DM_POLLER_STALE_HOURS:
-            issues.append(
-                f"DM poller stale: last_dm_event_id updated {age_hours:.1f}h ago "
-                f"(threshold {DM_POLLER_STALE_HOURS}h)"
             )
 
     return issues

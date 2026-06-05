@@ -7,7 +7,9 @@ import { DepositMonitor } from "./wallet/depositMonitor.js";
 import { WithdrawalProcessor } from "./wallet/withdrawalProcessor.js";
 import { createTwitterClient } from "./twitter/client.js";
 import { MentionPoller } from "./twitter/mentionPoller.js";
-import { DMPoller } from "./twitter/dmPoller.js";
+// DMPoller intentionally left unimported — X's E2E rollout makes DMs
+// unreliable, so the bot no longer reads them. The dmPoller.ts file is kept
+// in case we ever resurrect the channel.
 import { Responder } from "./twitter/responder.js";
 import { CommandRouter } from "./commands/commandRouter.js";
 import { DepositCommand } from "./commands/depositCommand.js";
@@ -83,18 +85,9 @@ async function main(): Promise<void> {
     db
   );
 
-  const dmPoller = new DMPoller(
-    twitterClient,
-    config.twitterBotUserId,
-    90_000, // Poll DMs every 90 seconds to avoid rate limiting
-    (ctx) => commandRouter.route(ctx),
-    pollState
-  );
-
   const depositMonitor = new DepositMonitor(
     db,
     walletManager,
-    responder,
     config.requiredConfirmations,
     config.pollIntervalMs * 4 // Check deposits less frequently (every ~60s)
   );
@@ -102,14 +95,12 @@ async function main(): Promise<void> {
   const withdrawalProcessor = new WithdrawalProcessor(
     db,
     walletManager,
-    responder,
     config.withdrawalFeeSatoshis,
     10_000 // Process queued web-initiated withdrawals every 10s
   );
 
   // 7. Start everything
   mentionPoller.start();
-  dmPoller.start();
   depositMonitor.start();
   withdrawalProcessor.start();
 
@@ -127,7 +118,6 @@ async function main(): Promise<void> {
   const shutdown = async () => {
     logger.info("Shutting down...");
     mentionPoller.stop();
-    dmPoller.stop();
     depositMonitor.stop();
     withdrawalProcessor.stop();
     closeDatabase();

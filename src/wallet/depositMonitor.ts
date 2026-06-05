@@ -3,8 +3,6 @@ import { UserRepository } from "../db/repositories/userRepository.js";
 import { TransactionRepository } from "../db/repositories/transactionRepository.js";
 import { BalanceService } from "../services/balanceService.js";
 import { HDWalletManager } from "./hdWallet.js";
-import { Responder } from "../twitter/responder.js";
-import { formatBch } from "../utils/satoshiConversion.js";
 import { withTimeout } from "../utils/withTimeout.js";
 import pino from "pino";
 
@@ -20,7 +18,6 @@ export class DepositMonitor {
   constructor(
     private db: Database.Database,
     private walletManager: HDWalletManager,
-    private responder: Responder,
     private requiredConfirmations: number,
     private pollIntervalMs: number
   ) {
@@ -220,14 +217,10 @@ export class DepositMonitor {
             "Deposit confirmed and credited"
           );
 
-          // Notify the user
-          if (!user.twitter_user_id.startsWith("pending_")) {
-            await this.responder.sendDM(
-              user.twitter_user_id,
-              `Deposit of ${formatBch(tx.amount_satoshis)} BCH confirmed! ` +
-                `Your balance: ${formatBch(this.balanceService.getBalance(user.id))} BCH`
-            );
-          }
+          // User-facing notifications happen on https://tipbot.qube.cash —
+          // they can see balance + history there. We no longer DM deposit
+          // confirmations because X's E2E rollout makes DMs unreliable for
+          // an increasing share of users.
 
           // Sweep to hot wallet
           try {

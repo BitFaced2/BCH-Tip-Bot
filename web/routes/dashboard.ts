@@ -3,7 +3,9 @@ import { getSession } from "../lib/session.js";
 import {
   findInFlightWithdrawal,
   findOrClaimUser,
+  getRecentTransactions,
   queueWithdrawal,
+  type HistoryRow,
 } from "../lib/userDb.js";
 import {
   bchToSatoshis,
@@ -23,8 +25,11 @@ dashboardRouter.get("/", (req, res) => {
   }
   const user = findOrClaimUser(session.twitterUserId, session.username);
   const inFlight = user ? findInFlightWithdrawal(user.id) : null;
+  const history = user ? getRecentTransactions(user.id, 10) : [];
   const notice = decodeNotice(req.query.notice as string | undefined);
-  res.type("html").send(renderDashboard(session.username, user, inFlight, notice));
+  res
+    .type("html")
+    .send(renderDashboard(session.username, user, inFlight, history, notice));
 });
 
 dashboardRouter.post("/withdraw", (req, res) => {
@@ -121,6 +126,7 @@ function renderDashboard(
   username: string,
   user: ReturnType<typeof findOrClaimUser>,
   inFlight: ReturnType<typeof findInFlightWithdrawal>,
+  history: HistoryRow[],
   notice: { kind: string; text: string } | null
 ): string {
   const safeUser = escapeHtml(username);
@@ -156,6 +162,7 @@ function renderDashboard(
     `;
 
   const withdrawSection = user ? renderWithdrawSection(inFlight) : "";
+  const historySection = user && history.length > 0 ? renderHistorySection(history) : "";
 
   return page(
     "BCH Tip Bot",
@@ -171,6 +178,7 @@ function renderDashboard(
       ${notice ? renderNotice(notice) : ""}
       ${accountSection}
       ${withdrawSection}
+      ${historySection}
 
       <script>
         async function copyAddr() {
@@ -185,6 +193,43 @@ function renderDashboard(
       </script>
     `
   );
+}
+
+function renderHistorySection(rows: HistoryRow[]): string {
+  const items = rows
+    .map((r) => {
+      const typeLabel = r.type === "deposit" ? "Deposit" : "Withdrawal";
+      const link = r.txid
+        ? `<a class="link" href="https://blockchair.com/bitcoin-cash/transaction/${escapeHtml(r.txid)}" target="_blank" rel="noopener">TX</a>`
+        : "";
+      const addr = r.address
+        ? `<span class="muted small">${escapeHtml(shorten(r.address))}</span>`
+        : "";
+      return `
+        <li>
+          <div class="hrow">
+            <span><strong>${typeLabel}</strong> ${formatBch(r.amount_satoshis)} BCH</span>
+            <span class="status status-${escapeHtml(r.status)}">${escapeHtml(r.status)}</span>
+          </div>
+          <div class="hrow sub">
+            <span class="muted small">${escapeHtml(r.created_at)} UTC ${addr}</span>
+            ${link}
+          </div>
+        </li>
+      `;
+    })
+    .join("");
+  return `
+    <section class="card">
+      <div class="label">Recent activity</div>
+      <ul class="history">${items}</ul>
+    </section>
+  `;
+}
+
+function shorten(addr: string): string {
+  if (addr.length <= 24) return addr;
+  return `${addr.slice(0, 14)}…${addr.slice(-8)}`;
 }
 
 function renderNotice(notice: { kind: string; text: string }): string {
@@ -312,5 +357,16 @@ function baseCss(): string {
     }
     .notice.ok { border-color: #1d9bf0; background: rgba(29,155,240,0.1); }
     .notice.error { border-color: #f4212e; background: rgba(244,33,46,0.1); }
+    .history { list-style: none; padding: 0; margin: .5rem 0 0; }
+    .history li { padding: .6rem 0; border-bottom: 1px solid #2f3336; }
+    .history li:last-child { border-bottom: 0; }
+    .hrow { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+    .hrow.sub { margin-top: .2rem; }
+    .status { font-size: .8rem; padding: 2px 8px; border-radius: 999px; border: 1px solid #2f3336; }
+    .status-queued { color: #c5a700; border-color: #6b5b00; }
+    .status-pending { color: #c5a700; border-color: #6b5b00; }
+    .status-confirming { color: #1d9bf0; border-color: #145687; }
+    .status-confirmed { color: #00ba7c; border-color: #00513a; }
+    .status-failed { color: #f4212e; border-color: #6b1015; }
   `;
 }
