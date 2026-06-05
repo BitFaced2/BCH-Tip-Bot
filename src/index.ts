@@ -4,6 +4,7 @@ import { runMigrations } from "./db/schema.js";
 import { PollStateRepository } from "./db/repositories/pollStateRepository.js";
 import { HDWalletManager } from "./wallet/hdWallet.js";
 import { DepositMonitor } from "./wallet/depositMonitor.js";
+import { WithdrawalProcessor } from "./wallet/withdrawalProcessor.js";
 import { createTwitterClient } from "./twitter/client.js";
 import { MentionPoller } from "./twitter/mentionPoller.js";
 import { DMPoller } from "./twitter/dmPoller.js";
@@ -98,10 +99,19 @@ async function main(): Promise<void> {
     config.pollIntervalMs * 4 // Check deposits less frequently (every ~60s)
   );
 
+  const withdrawalProcessor = new WithdrawalProcessor(
+    db,
+    walletManager,
+    responder,
+    config.withdrawalFeeSatoshis,
+    10_000 // Process queued web-initiated withdrawals every 10s
+  );
+
   // 7. Start everything
   mentionPoller.start();
   dmPoller.start();
   depositMonitor.start();
+  withdrawalProcessor.start();
 
   logger.info("BCH Tip Bot is running!");
   logger.info(
@@ -119,6 +129,7 @@ async function main(): Promise<void> {
     mentionPoller.stop();
     dmPoller.stop();
     depositMonitor.stop();
+    withdrawalProcessor.stop();
     closeDatabase();
     logger.info("Shutdown complete");
     process.exit(0);

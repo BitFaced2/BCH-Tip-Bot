@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.hallyuwebsite.com)",
+      "Bash(node:*)",
+      "WebFetch(domain:mainnet.cash)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:devcommunity.x.com)",
+      "WebFetch(domain:docs.x.com)",
+      "Bash(git init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(gh auth:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh repo:*)",
+      "Bash(ssh -i ~/.ssh/qube_stats_key -o StrictHostKeyChecking=no bit_faced@qube.cash \"cd ~/BCH-Tip-Bot && git log --oneline -5 && echo '---' && pm2 list\")",
+      "Bash(ssh -i ~/.ssh/qube_stats_key -o StrictHostKeyChecking=no bit_faced@qube.cash \"pm2 logs bch-tip-bot --nostream --lines 60 --err\")",
+      "Bash(ssh -i ~/.ssh/qube_stats_key -o StrictHostKeyChecking=no bit_faced@qube.cash \"pm2 logs bch-tip-bot --nostream --lines 40 --out\")",
+      "Bash(ssh *)",
+      "Bash(npm run *)"
+    ]
+  }
+}

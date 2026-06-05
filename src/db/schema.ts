@@ -25,7 +25,7 @@ export function runMigrations(db: Database.Database): void {
       address           TEXT,
       confirmations     INTEGER NOT NULL DEFAULT 0,
       status            TEXT    NOT NULL DEFAULT 'pending'
-                                CHECK(status IN ('pending', 'confirming', 'confirmed', 'failed')),
+                                CHECK(status IN ('queued', 'pending', 'confirming', 'confirmed', 'failed')),
       created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
       updated_at        TEXT    NOT NULL DEFAULT (datetime('now'))
     );
@@ -63,4 +63,48 @@ export function runMigrations(db: Database.Database): void {
 
     INSERT OR IGNORE INTO app_state (key, value) VALUES ('next_derivation_index', '1');
   `);
+
+  migrateAddQueuedStatus(db);
+}
+
+/**
+ * SQLite CHECK constraints can't be ALTER'd in place. If the existing
+ * transactions table was created before 'queued' was added to the status
+ * domain, recreate the table with the new constraint and copy the rows
+ * across. Idempotent — does nothing on tables already containing 'queued'.
+ */
+function migrateAddQueuedStatus(db: Database.Database): void {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='transactions'")
+    .get() as { sql: string } | undefined;
+  if (!row) return;
+  if (row.sql.includes("'queued'")) return;
+
+  const txn = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE transactions_new (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id           INTEGER NOT NULL REFERENCES users(id),
+        type              TEXT    NOT NULL CHECK(type IN ('deposit', 'withdrawal')),
+        amount_satoshis   INTEGER NOT NULL,
+        txid              TEXT,
+        address           TEXT,
+        confirmations     INTEGER NOT NULL DEFAULT 0,
+        status            TEXT    NOT NULL DEFAULT 'pending'
+                                  CHECK(status IN ('queued', 'pending', 'confirming', 'confirmed', 'failed')),
+        created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
+        updated_at        TEXT    NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO transactions_new
+        SELECT id, user_id, type, amount_satoshis, txid, address, confirmations,
+               status, created_at, updated_at
+          FROM transactions;
+      DROP TABLE transactions;
+      ALTER TABLE transactions_new RENAME TO transactions;
+      CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_transactions_txid ON transactions(txid);
+      CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
+    `);
+  });
+  txn.immediate();
 }

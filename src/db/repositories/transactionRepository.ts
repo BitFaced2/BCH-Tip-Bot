@@ -24,6 +24,14 @@ export class TransactionRepository {
       .all() as Transaction[];
   }
 
+  findQueuedWithdrawals(): Transaction[] {
+    return this.db
+      .prepare(
+        "SELECT * FROM transactions WHERE type = 'withdrawal' AND status = 'queued' ORDER BY id ASC"
+      )
+      .all() as Transaction[];
+  }
+
   create(
     userId: number,
     type: "deposit" | "withdrawal",

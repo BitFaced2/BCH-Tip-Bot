@@ -62,3 +62,84 @@ export function findOrClaimUser(
   });
   return claim.immediate();
 }
+
+export interface InFlightWithdrawal {
+  id: number;
+  amount_satoshis: number;
+  address: string | null;
+  status: "queued" | "pending";
+  created_at: string;
+}
+
+export function findInFlightWithdrawal(userId: number): InFlightWithdrawal | null {
+  const row = db()
+    .prepare(
+      `SELECT id, amount_satoshis, address, status, created_at
+         FROM transactions
+        WHERE user_id = ? AND type = 'withdrawal' AND status IN ('queued', 'pending')
+        ORDER BY id DESC LIMIT 1`
+    )
+    .get(userId) as InFlightWithdrawal | undefined;
+  return row ?? null;
+}
+
+export type QueueResult =
+  | { ok: true; id: number }
+  | { ok: false; error: string };
+
+/**
+ * Validate the user has enough balance and no in-flight withdrawal, then
+ * insert a queued withdrawal row. All checks and the insert run inside a
+ * single IMMEDIATE transaction so two parallel submissions can't both win.
+ *
+ * The bot's WithdrawalProcessor picks queued rows up within ~10 seconds,
+ * debits the balance atomically, and broadcasts.
+ */
+export function queueWithdrawal(
+  userId: number,
+  amountSatoshis: number,
+  feeSatoshis: number,
+  normalizedAddress: string
+): QueueResult {
+  const totalDebit = amountSatoshis + feeSatoshis;
+  let result: QueueResult = { ok: false, error: "unknown" };
+
+  const txn = db().transaction(() => {
+    const existing = db()
+      .prepare(
+        `SELECT id FROM transactions
+          WHERE user_id = ? AND type = 'withdrawal' AND status IN ('queued', 'pending')`
+      )
+      .get(userId) as { id: number } | undefined;
+    if (existing) {
+      result = {
+        ok: false,
+        error: "You already have a withdrawal in progress. Wait for it to settle before queuing another.",
+      };
+      return;
+    }
+    const user = db()
+      .prepare("SELECT balance_satoshis FROM users WHERE id = ?")
+      .get(userId) as { balance_satoshis: number } | undefined;
+    if (!user) {
+      result = { ok: false, error: "Account not found." };
+      return;
+    }
+    if (user.balance_satoshis < totalDebit) {
+      result = {
+        ok: false,
+        error: `Insufficient balance. You have ${user.balance_satoshis.toLocaleString()} sats; need ${totalDebit.toLocaleString()} (amount + ${feeSatoshis} sat fee).`,
+      };
+      return;
+    }
+    const insert = db()
+      .prepare(
+        `INSERT INTO transactions (user_id, type, amount_satoshis, address, txid, status)
+         VALUES (?, 'withdrawal', ?, ?, NULL, 'queued')`
+      )
+      .run(userId, amountSatoshis, normalizedAddress);
+    result = { ok: true, id: insert.lastInsertRowid as number };
+  });
+  txn.immediate();
+  return result;
+}

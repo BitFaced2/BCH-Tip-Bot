@@ -19,6 +19,12 @@ function required(name: string): string {
   return value;
 }
 
+function requiredInt(name: string): number {
+  const n = parseInt(required(name), 10);
+  if (!Number.isFinite(n)) throw new Error(`Env var ${name} is not a valid integer`);
+  return n;
+}
+
 export const config = {
   twitterClientId: required("TWITTER_CLIENT_ID"),
   twitterClientSecret: required("TWITTER_CLIENT_SECRET"),
@@ -27,4 +33,10 @@ export const config = {
   port: parseInt(process.env.WEB_PORT ?? "3001", 10),
   sessionSecret: required("SESSION_SECRET"),
   dbPath: required("DB_PATH"),
+
+  // Shared withdrawal config — read from the bot's .env so both processes
+  // agree on the limits without duplicating values across .env files.
+  minWithdrawalSatoshis: requiredInt("MIN_WITHDRAWAL_SATOSHIS"),
+  maxWithdrawalSatoshis: requiredInt("MAX_WITHDRAWAL_SATOSHIS"),
+  withdrawalFeeSatoshis: requiredInt("WITHDRAWAL_FEE_SATOSHIS"),
 };

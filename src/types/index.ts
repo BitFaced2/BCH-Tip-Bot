@@ -17,7 +17,7 @@ export interface Transaction {
   txid: string | null;
   address: string | null;
   confirmations: number;
-  status: "pending" | "confirming" | "confirmed" | "failed";
+  status: "queued" | "pending" | "confirming" | "confirmed" | "failed";
   created_at: string;
   updated_at: string;
 }
