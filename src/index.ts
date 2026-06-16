@@ -5,6 +5,7 @@ import { PollStateRepository } from "./db/repositories/pollStateRepository.js";
 import { HDWalletManager } from "./wallet/hdWallet.js";
 import { DepositMonitor } from "./wallet/depositMonitor.js";
 import { WithdrawalProcessor } from "./wallet/withdrawalProcessor.js";
+import { TipReturnProcessor } from "./services/tipReturnProcessor.js";
 import { InternalServer } from "./web/internalServer.js";
 import { createTwitterClient } from "./twitter/client.js";
 import { MentionPoller } from "./twitter/mentionPoller.js";
@@ -106,11 +107,19 @@ async function main(): Promise<void> {
     tipService
   );
 
+  const tipReturnProcessor = new TipReturnProcessor(
+    db,
+    config.feeAddress,
+    7, // unclaimed window in days
+    60 * 60 * 1000 // poll every hour
+  );
+
   // 7. Start everything
   mentionPoller.start();
   depositMonitor.start();
   withdrawalProcessor.start();
   internalServer.start();
+  tipReturnProcessor.start();
 
   logger.info("BCH Tip Bot is running!");
   logger.info(
@@ -129,6 +138,7 @@ async function main(): Promise<void> {
     depositMonitor.stop();
     withdrawalProcessor.stop();
     internalServer.stop();
+    tipReturnProcessor.stop();
     closeDatabase();
     logger.info("Shutdown complete");
     process.exit(0);

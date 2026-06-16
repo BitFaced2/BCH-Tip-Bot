@@ -29,7 +29,7 @@ export interface Tip {
   amount_satoshis: number;
   fee_satoshis: number;
   tweet_id: string | null;
-  status: "completed" | "failed";
+  status: "completed" | "failed" | "returned";
   created_at: string;
 }
 

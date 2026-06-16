@@ -42,7 +42,7 @@ export function runMigrations(db: Database.Database): void {
       fee_satoshis      INTEGER NOT NULL DEFAULT 0,
       tweet_id          TEXT,
       status            TEXT    NOT NULL DEFAULT 'completed'
-                                CHECK(status IN ('completed', 'failed')),
+                                CHECK(status IN ('completed', 'failed', 'returned')),
       created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -65,6 +65,7 @@ export function runMigrations(db: Database.Database): void {
   `);
 
   migrateAddQueuedStatus(db);
+  migrateAddReturnedTipStatus(db);
 }
 
 /**
@@ -73,6 +74,44 @@ export function runMigrations(db: Database.Database): void {
  * domain, recreate the table with the new constraint and copy the rows
  * across. Idempotent — does nothing on tables already containing 'queued'.
  */
+/**
+ * Adds 'returned' to the tips.status CHECK domain for the return-to-sender
+ * feature. SQLite can't alter a CHECK in place — recreate and copy.
+ */
+function migrateAddReturnedTipStatus(db: Database.Database): void {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tips'")
+    .get() as { sql: string } | undefined;
+  if (!row) return;
+  if (row.sql.includes("'returned'")) return;
+
+  const txn = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE tips_new (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_user_id      INTEGER NOT NULL REFERENCES users(id),
+        to_user_id        INTEGER NOT NULL REFERENCES users(id),
+        amount_satoshis   INTEGER NOT NULL,
+        fee_satoshis      INTEGER NOT NULL DEFAULT 0,
+        tweet_id          TEXT,
+        status            TEXT    NOT NULL DEFAULT 'completed'
+                                  CHECK(status IN ('completed', 'failed', 'returned')),
+        created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO tips_new
+        SELECT id, from_user_id, to_user_id, amount_satoshis, fee_satoshis,
+               tweet_id, status, created_at
+          FROM tips;
+      DROP TABLE tips;
+      ALTER TABLE tips_new RENAME TO tips;
+      CREATE INDEX IF NOT EXISTS idx_tips_from_user_id ON tips(from_user_id);
+      CREATE INDEX IF NOT EXISTS idx_tips_to_user_id ON tips(to_user_id);
+      CREATE INDEX IF NOT EXISTS idx_tips_tweet_id ON tips(tweet_id);
+    `);
+  });
+  txn.immediate();
+}
+
 function migrateAddQueuedStatus(db: Database.Database): void {
   const row = db
     .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='transactions'")
