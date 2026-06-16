@@ -77,6 +77,12 @@ export function runMigrations(db: Database.Database): void {
 /**
  * Adds 'returned' to the tips.status CHECK domain for the return-to-sender
  * feature. SQLite can't alter a CHECK in place — recreate and copy.
+ *
+ * Follows SQLite's documented "12-step table modification" recipe:
+ * foreign_keys must be OFF during the DROP+RENAME because tips has two
+ * REFERENCES users(id) constraints (with foreign_keys=ON the FK metadata
+ * rebind during ALTER TABLE RENAME trips the enforcement check). The
+ * pragma is a no-op inside a transaction, so it has to be set first.
  */
 function migrateAddReturnedTipStatus(db: Database.Database): void {
   const row = db
@@ -85,31 +91,45 @@ function migrateAddReturnedTipStatus(db: Database.Database): void {
   if (!row) return;
   if (row.sql.includes("'returned'")) return;
 
-  const txn = db.transaction(() => {
-    db.exec(`
-      CREATE TABLE tips_new (
-        id                INTEGER PRIMARY KEY AUTOINCREMENT,
-        from_user_id      INTEGER NOT NULL REFERENCES users(id),
-        to_user_id        INTEGER NOT NULL REFERENCES users(id),
-        amount_satoshis   INTEGER NOT NULL,
-        fee_satoshis      INTEGER NOT NULL DEFAULT 0,
-        tweet_id          TEXT,
-        status            TEXT    NOT NULL DEFAULT 'completed'
-                                  CHECK(status IN ('completed', 'failed', 'returned')),
-        created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
+  db.pragma("foreign_keys = OFF");
+  try {
+    const txn = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE tips_new (
+          id                INTEGER PRIMARY KEY AUTOINCREMENT,
+          from_user_id      INTEGER NOT NULL REFERENCES users(id),
+          to_user_id        INTEGER NOT NULL REFERENCES users(id),
+          amount_satoshis   INTEGER NOT NULL,
+          fee_satoshis      INTEGER NOT NULL DEFAULT 0,
+          tweet_id          TEXT,
+          status            TEXT    NOT NULL DEFAULT 'completed'
+                                    CHECK(status IN ('completed', 'failed', 'returned')),
+          created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
+        );
+        INSERT INTO tips_new
+          SELECT id, from_user_id, to_user_id, amount_satoshis, fee_satoshis,
+                 tweet_id, status, created_at
+            FROM tips;
+        DROP TABLE tips;
+        ALTER TABLE tips_new RENAME TO tips;
+        CREATE INDEX IF NOT EXISTS idx_tips_from_user_id ON tips(from_user_id);
+        CREATE INDEX IF NOT EXISTS idx_tips_to_user_id ON tips(to_user_id);
+        CREATE INDEX IF NOT EXISTS idx_tips_tweet_id ON tips(tweet_id);
+      `);
+    });
+    txn.immediate();
+
+    // Post-migration sanity check before re-enabling enforcement.
+    const violations = db.pragma("foreign_key_check") as unknown[];
+    if (violations.length > 0) {
+      throw new Error(
+        "foreign_key_check found violations after tips migration: " +
+          JSON.stringify(violations)
       );
-      INSERT INTO tips_new
-        SELECT id, from_user_id, to_user_id, amount_satoshis, fee_satoshis,
-               tweet_id, status, created_at
-          FROM tips;
-      DROP TABLE tips;
-      ALTER TABLE tips_new RENAME TO tips;
-      CREATE INDEX IF NOT EXISTS idx_tips_from_user_id ON tips(from_user_id);
-      CREATE INDEX IF NOT EXISTS idx_tips_to_user_id ON tips(to_user_id);
-      CREATE INDEX IF NOT EXISTS idx_tips_tweet_id ON tips(tweet_id);
-    `);
-  });
-  txn.immediate();
+    }
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
 }
 
 function migrateAddQueuedStatus(db: Database.Database): void {
