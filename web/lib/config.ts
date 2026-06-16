@@ -39,4 +39,8 @@ export const config = {
   minWithdrawalSatoshis: requiredInt("MIN_WITHDRAWAL_SATOSHIS"),
   maxWithdrawalSatoshis: requiredInt("MAX_WITHDRAWAL_SATOSHIS"),
   withdrawalFeeSatoshis: requiredInt("WITHDRAWAL_FEE_SATOSHIS"),
+
+  // Bot's loopback HTTP server, used to ensure-user on first sign-in.
+  internalApiUrl: required("INTERNAL_API_URL"),
+  internalApiToken: required("INTERNAL_API_TOKEN"),
 };

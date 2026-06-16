@@ -5,6 +5,7 @@ import { PollStateRepository } from "./db/repositories/pollStateRepository.js";
 import { HDWalletManager } from "./wallet/hdWallet.js";
 import { DepositMonitor } from "./wallet/depositMonitor.js";
 import { WithdrawalProcessor } from "./wallet/withdrawalProcessor.js";
+import { InternalServer } from "./web/internalServer.js";
 import { createTwitterClient } from "./twitter/client.js";
 import { MentionPoller } from "./twitter/mentionPoller.js";
 // DMPoller intentionally left unimported — X's E2E rollout makes DMs
@@ -99,10 +100,17 @@ async function main(): Promise<void> {
     10_000 // Process queued web-initiated withdrawals every 10s
   );
 
+  const internalServer = new InternalServer(
+    config.internalApiPort,
+    config.internalApiToken,
+    tipService
+  );
+
   // 7. Start everything
   mentionPoller.start();
   depositMonitor.start();
   withdrawalProcessor.start();
+  internalServer.start();
 
   logger.info("BCH Tip Bot is running!");
   logger.info(
@@ -120,6 +128,7 @@ async function main(): Promise<void> {
     mentionPoller.stop();
     depositMonitor.stop();
     withdrawalProcessor.stop();
+    internalServer.stop();
     closeDatabase();
     logger.info("Shutdown complete");
     process.exit(0);

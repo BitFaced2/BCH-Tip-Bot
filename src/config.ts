@@ -40,4 +40,8 @@ export const config = {
 
   // Logging
   logLevel: optional("LOG_LEVEL", "info"),
+
+  // Internal HTTP server (loopback only, used by tipbot-web)
+  internalApiToken: required("INTERNAL_API_TOKEN"),
+  internalApiPort: parseInt(optional("INTERNAL_API_PORT", "3002"), 10),
 } as const;

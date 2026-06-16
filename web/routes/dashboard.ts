@@ -7,6 +7,10 @@ import {
   queueWithdrawal,
   type HistoryRow,
 } from "../lib/userDb.js";
+import { ensureUserViaBot } from "../lib/botInternalClient.js";
+import pino from "pino";
+
+const logger = pino({ name: "dashboard" });
 import {
   bchToSatoshis,
   isValidAmount,
@@ -17,13 +21,27 @@ import { config } from "../lib/config.js";
 
 export const dashboardRouter = Router();
 
-dashboardRouter.get("/", (req, res) => {
+dashboardRouter.get("/", async (req, res) => {
   const session = getSession(req);
   if (!session) {
     res.type("html").send(renderLogin());
     return;
   }
-  const user = findOrClaimUser(session.twitterUserId, session.username);
+  let user = findOrClaimUser(session.twitterUserId, session.username);
+
+  // First-time signer with no tip history: ask the bot to bootstrap them.
+  // The bot has the HD seed and derives a deposit address. We then re-query
+  // by twitter_user_id. If the bot is unreachable, fall through to the
+  // "no account yet" UI so the page still renders.
+  if (!user) {
+    try {
+      await ensureUserViaBot(session.twitterUserId, session.username);
+      user = findOrClaimUser(session.twitterUserId, session.username);
+    } catch (err) {
+      logger.error({ err, username: session.username }, "ensureUserViaBot failed");
+    }
+  }
+
   const inFlight = user ? findInFlightWithdrawal(user.id) : null;
   const history = user ? getRecentTransactions(user.id, 10) : [];
   const notice = decodeNotice(req.query.notice as string | undefined);
