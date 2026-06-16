@@ -18,6 +18,8 @@ export class HelpCommand {
       `  @${this.botUsername} tip @user <amount> BCH`,
       ``,
       `Example: @${this.botUsername} tip @alice 0.001 BCH`,
+      ``,
+      `Receiving tips? Sign in within 7 days to claim. After that, tips return to the sender.`,
     ].join("\n");
 
     if (ctx.type === "dm") {
