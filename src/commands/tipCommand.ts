@@ -127,6 +127,11 @@ export class TipCommand {
       if (newTipped.length > 0) message += "\n\n";
       const each = existingTipped.length > 1 ? " each" : "";
       message += `Tipped ${existingTipped.join(", ")} ${amountLabel}${each}!${usdSuffix}`;
+      // Pure existing-recipient tip: nudge any scrollers-by to sign up.
+      // Mixed tips already have a sign-in line in the welcome block above.
+      if (newTipped.length === 0) {
+        message += `\n\nSign in at tipbot.cash`;
+      }
     }
 
     if (failed.length > 0) {
