@@ -112,21 +112,21 @@ export class TipCommand {
     const amountSats = bchToSatoshis(amount);
     const bchUsd = await this.priceService.getBchUsd();
     const usd = formatUsd(amountSats, bchUsd);
-    const amountStr = `${formatBch(amountSats)} BCH`;
+    const amountLabel = `${formatBch(amountSats)} BCH`;
     const usdSuffix = usd ? ` ${usd}` : "";
 
     let message = "";
 
     if (newTipped.length > 0) {
       const each = newTipped.length > 1 ? " each" : "";
-      message += `${newTipped.join(", ")}, you've received ${amountStr}${each}!${usdSuffix}\n\n`;
+      message += `${newTipped.join(", ")}, you've received ${amountLabel}${each}!${usdSuffix}\n\n`;
       message += `Sign in at https://tipbot.qube.cash within 7 days to claim. You can also check your balance, deposit/withdraw, and view activity.`;
     }
 
     if (existingTipped.length > 0) {
       if (newTipped.length > 0) message += "\n\n";
       const each = existingTipped.length > 1 ? " each" : "";
-      message += `Tipped ${existingTipped.join(", ")} ${amountStr}${each}!${usdSuffix}`;
+      message += `Tipped ${existingTipped.join(", ")} ${amountLabel}${each}!${usdSuffix}`;
     }
 
     if (failed.length > 0) {
