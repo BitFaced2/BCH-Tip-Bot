@@ -130,7 +130,7 @@ export class TipCommand {
       // Pure existing-recipient tip: nudge any scrollers-by to sign up.
       // Mixed tips already have a sign-in line in the welcome block above.
       if (newTipped.length === 0) {
-        message += `\n\nSign in at tipbot.cash`;
+        message += `\n\nWant to use BCH Tip Bot? Sign in at tipbot.cash and deposit some BCH!`;
       }
     }
 
