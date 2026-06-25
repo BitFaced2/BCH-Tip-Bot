@@ -3,11 +3,13 @@ import { TipService } from "../services/tipService.js";
 import { Responder } from "../twitter/responder.js";
 import { isValidAmount, isValidUsername } from "../utils/bchValidation.js";
 import { bchToSatoshis, formatBch } from "../utils/satoshiConversion.js";
+import { PriceService, formatUsd } from "../services/priceService.js";
 
 export class TipCommand {
   constructor(
     private tipService: TipService,
-    private responder: Responder
+    private responder: Responder,
+    private priceService: PriceService
   ) {}
 
   private static MAX_RECIPIENTS = 5;
@@ -105,11 +107,11 @@ export class TipCommand {
     }
 
     const each = tipped.length > 1 ? " each" : "";
-    message += `Tipped ${tipped.join(", ")} ${formatBch(bchToSatoshis(amount))} BCH${each}!`;
-
-    if (totalFee > 0) {
-      message += ` (fee: ${totalFee} sats)`;
-    }
+    const amountSats = bchToSatoshis(amount);
+    const bchUsd = await this.priceService.getBchUsd();
+    const usd = formatUsd(amountSats, bchUsd);
+    message += `Tipped ${tipped.join(", ")} ${formatBch(amountSats)} BCH${each}!`;
+    if (usd) message += ` ${usd}`;
 
     if (failed.length > 0) {
       const failNames = failed.map(f => f.username).join(", ");

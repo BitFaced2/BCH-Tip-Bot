@@ -8,6 +8,7 @@ import {
   type HistoryRow,
 } from "../lib/userDb.js";
 import { ensureUserViaBot } from "../lib/botInternalClient.js";
+import { getBchUsd, formatUsd } from "../lib/priceClient.js";
 import pino from "pino";
 
 const logger = pino({ name: "dashboard" });
@@ -45,9 +46,10 @@ dashboardRouter.get("/", async (req, res) => {
   const inFlight = user ? findInFlightWithdrawal(user.id) : null;
   const history = user ? getRecentActivity(user.id, 15) : [];
   const notice = decodeNotice(req.query.notice as string | undefined);
+  const bchUsd = await getBchUsd();
   res
     .type("html")
-    .send(renderDashboard(session.username, user, inFlight, history, notice));
+    .send(renderDashboard(session.username, user, inFlight, history, notice, bchUsd));
 });
 
 dashboardRouter.post("/withdraw", (req, res) => {
@@ -145,10 +147,12 @@ function renderDashboard(
   user: ReturnType<typeof findOrClaimUser>,
   inFlight: ReturnType<typeof findInFlightWithdrawal>,
   history: HistoryRow[],
-  notice: { kind: string; text: string } | null
+  notice: { kind: string; text: string } | null,
+  bchUsd: number | null
 ): string {
   const safeUser = escapeHtml(username);
 
+  const balanceUsd = user ? formatUsd(user.balance_satoshis, bchUsd) : null;
   const accountSection = user
     ? `
       <section class="card">
@@ -158,7 +162,7 @@ function renderDashboard(
         </div>
         <div class="row sub">
           <span></span>
-          <span class="muted">${user.balance_satoshis.toLocaleString()} satoshis</span>
+          <span class="muted">${user.balance_satoshis.toLocaleString()} satoshis${balanceUsd ? " · " + balanceUsd : ""}</span>
         </div>
       </section>
 
@@ -180,7 +184,7 @@ function renderDashboard(
     `;
 
   const withdrawSection = user ? renderWithdrawSection(inFlight) : "";
-  const historySection = user && history.length > 0 ? renderHistorySection(history) : "";
+  const historySection = user && history.length > 0 ? renderHistorySection(history, bchUsd) : "";
 
   return page(
     "BCH Tip Bot",
@@ -213,7 +217,7 @@ function renderDashboard(
   );
 }
 
-function renderHistorySection(rows: HistoryRow[]): string {
+function renderHistorySection(rows: HistoryRow[], bchUsd: number | null): string {
   const items = rows
     .map((r) => {
       const typeLabel = labelFor(r.type);
@@ -223,10 +227,11 @@ function renderHistorySection(rows: HistoryRow[]): string {
       const counterparty = r.counterparty
         ? `<span class="muted small">${escapeHtml(counterpartyLabel(r.type, r.counterparty))}</span>`
         : "";
+      const usd = formatUsd(r.amount_satoshis, bchUsd);
       return `
         <li>
           <div class="hrow">
-            <span><strong>${typeLabel}</strong> ${formatBch(r.amount_satoshis)} BCH</span>
+            <span><strong>${typeLabel}</strong> ${formatBch(r.amount_satoshis)} BCH${usd ? ` <span class="muted small">${usd}</span>` : ""}</span>
             <span class="status status-${escapeHtml(r.status)}">${escapeHtml(r.status)}</span>
           </div>
           <div class="hrow sub">

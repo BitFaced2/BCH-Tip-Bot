@@ -20,6 +20,7 @@ import { TipCommand } from "./commands/tipCommand.js";
 import { WithdrawCommand } from "./commands/withdrawCommand.js";
 import { HelpCommand } from "./commands/helpCommand.js";
 import { TipService } from "./services/tipService.js";
+import { PriceService } from "./services/priceService.js";
 import pino from "pino";
 
 const logger = pino({ level: config.logLevel, name: "bch-tip-bot" });
@@ -57,11 +58,13 @@ async function main(): Promise<void> {
   );
   await tipService.initialize();
 
+  const priceService = new PriceService();
+
   // 5. Initialize command handlers
   const commandRouter = new CommandRouter({
     deposit: new DepositCommand(tipService, responder),
     balance: new BalanceCommand(tipService, responder),
-    tip: new TipCommand(tipService, responder),
+    tip: new TipCommand(tipService, responder, priceService),
     withdraw: new WithdrawCommand(
       db,
       tipService,
