@@ -160,7 +160,7 @@ function renderDashboard(
       <section class="card">
         <div class="row">
           <span class="label">Balance</span>
-          <span class="value">${formatBch(user.balance_satoshis)} BCH</span>
+          <span class="value">${formatBch(user.balance_satoshis)}&nbsp;BCH</span>
         </div>
         <div class="row sub">
           <span></span>
