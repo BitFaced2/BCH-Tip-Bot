@@ -44,7 +44,7 @@ dashboardRouter.get("/", async (req, res) => {
   }
 
   const inFlight = user ? findInFlightWithdrawal(user.id) : null;
-  const history = user ? getRecentActivity(user.id, 15) : [];
+  const history = user ? getRecentActivity(user.id, 50) : [];
   const notice = decodeNotice(req.query.notice as string | undefined);
   const bchUsd = await getBchUsd();
   res
@@ -185,6 +185,7 @@ function renderDashboard(
 
   const withdrawSection = user ? renderWithdrawSection(inFlight) : "";
   const historySection = user && history.length > 0 ? renderHistorySection(history, bchUsd) : "";
+  const disclaimer = user ? renderDisclaimer() : "";
 
   return page(
     "BCH Tip Bot",
@@ -201,6 +202,7 @@ function renderDashboard(
       ${accountSection}
       ${withdrawSection}
       ${historySection}
+      ${disclaimer}
 
       <script>
         async function copyAddr() {
@@ -218,35 +220,57 @@ function renderDashboard(
 }
 
 function renderHistorySection(rows: HistoryRow[], bchUsd: number | null): string {
-  const items = rows
-    .map((r) => {
-      const typeLabel = labelFor(r.type);
-      const link = r.txid
-        ? `<a class="link" href="https://blockchair.com/bitcoin-cash/transaction/${escapeHtml(r.txid)}" target="_blank" rel="noopener">TX</a>`
-        : "";
-      const counterparty = r.counterparty
-        ? `<span class="muted small">${escapeHtml(counterpartyLabel(r.type, r.counterparty))}</span>`
-        : "";
-      const usd = formatUsd(r.amount_satoshis, bchUsd);
-      return `
-        <li>
-          <div class="hrow">
-            <span><strong>${typeLabel}</strong> ${formatBch(r.amount_satoshis)} BCH${usd ? ` <span class="muted small">${usd}</span>` : ""}</span>
-            <span class="status status-${escapeHtml(r.status)}">${escapeHtml(r.status)}</span>
-          </div>
-          <div class="hrow sub">
-            <span class="muted small">${escapeHtml(r.created_at)} UTC ${counterparty}</span>
-            ${link}
-          </div>
-        </li>
-      `;
-    })
-    .join("");
+  const INITIAL_VISIBLE = 5;
+  const visible = rows.slice(0, INITIAL_VISIBLE);
+  const rest = rows.slice(INITIAL_VISIBLE);
+
+  const renderRow = (r: HistoryRow) => {
+    const typeLabel = labelFor(r.type);
+    const link = r.txid
+      ? `<a class="link" href="https://blockchair.com/bitcoin-cash/transaction/${escapeHtml(r.txid)}" target="_blank" rel="noopener">TX</a>`
+      : "";
+    const counterparty = r.counterparty
+      ? `<span class="muted small">${escapeHtml(counterpartyLabel(r.type, r.counterparty))}</span>`
+      : "";
+    const usd = formatUsd(r.amount_satoshis, bchUsd);
+    return `
+      <li>
+        <div class="hrow">
+          <span><strong>${typeLabel}</strong> ${formatBch(r.amount_satoshis)} BCH${usd ? ` <span class="muted small">${usd}</span>` : ""}</span>
+          <span class="status status-${escapeHtml(r.status)}">${escapeHtml(r.status)}</span>
+        </div>
+        <div class="hrow sub">
+          <span class="muted small">${escapeHtml(r.created_at)} UTC ${counterparty}</span>
+          ${link}
+        </div>
+      </li>
+    `;
+  };
+
+  const visibleHtml = visible.map(renderRow).join("");
+  const moreHtml = rest.length > 0
+    ? `
+        <details class="history-more">
+          <summary>Show ${rest.length} more</summary>
+          <ul class="history">${rest.map(renderRow).join("")}</ul>
+        </details>
+      `
+    : "";
+
   return `
     <section class="card">
       <div class="label">Recent activity</div>
-      <ul class="history">${items}</ul>
+      <ul class="history">${visibleHtml}</ul>
+      ${moreHtml}
     </section>
+  `;
+}
+
+function renderDisclaimer(): string {
+  return `
+    <p class="disclaimer muted small">
+      Tips charge a 1% fee from the sender. Unclaimed tips return to the sender after 7 days.
+    </p>
   `;
 }
 
@@ -412,5 +436,16 @@ function baseCss(): string {
     .status-completed { color: #8899a6; border-color: #2f3336; }
     .status-returned { color: #c5a700; border-color: #6b5b00; }
     .status-failed { color: #f4212e; border-color: #6b1015; }
+    .history-more { margin-top: .5rem; }
+    .history-more summary {
+      cursor: pointer; color: #1d9bf0; font-size: .9rem; padding: .3rem 0;
+      list-style: none;
+    }
+    .history-more summary::-webkit-details-marker { display: none; }
+    .history-more summary:hover { text-decoration: underline; }
+    .history-more[open] summary { margin-bottom: .25rem; }
+    .disclaimer {
+      text-align: center; padding: 1rem 0 2rem; margin: 0;
+    }
   `;
 }
