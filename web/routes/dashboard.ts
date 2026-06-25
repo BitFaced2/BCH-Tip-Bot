@@ -157,14 +157,10 @@ function renderDashboard(
   const balanceUsd = user ? formatUsd(user.balance_satoshis, bchUsd) : null;
   const accountSection = user
     ? `
-      <section class="card">
-        <div class="row">
-          <span class="label">Balance</span>
-          <span class="value">${formatBch(user.balance_satoshis)}&nbsp;BCH</span>
-        </div>
-        <div class="row sub">
-          <span></span>
-          <span class="muted">${user.balance_satoshis.toLocaleString()} satoshis${balanceUsd ? " · " + balanceUsd : ""}</span>
+      <section class="card card-balance">
+        <div class="label">Balance</div>
+        <div class="value balance-amount">${formatBch(user.balance_satoshis)}&nbsp;BCH</div>
+        <div class="muted small">${user.balance_satoshis.toLocaleString()} satoshis${balanceUsd ? " · " + balanceUsd : ""}
         </div>
       </section>
 
@@ -450,6 +446,18 @@ function baseCss(): string {
       padding: 1.25rem 1.5rem;
       margin-bottom: 1rem;
       position: relative;
+    }
+    .card-balance {
+      text-align: center;
+      border-color: var(--bch-green);
+      box-shadow: 0 0 28px rgba(10, 193, 142, 0.18);
+      padding: 1.5rem 1.25rem 1.25rem;
+    }
+    .card-balance .label { display: block; margin-bottom: .5rem; }
+    .balance-amount {
+      display: block;
+      margin-bottom: .35rem;
+      font-size: clamp(1.4rem, 6vw, 1.9rem);
     }
     .row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
     .row.sub { margin-top: -.2rem; }
