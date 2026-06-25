@@ -100,21 +100,37 @@ export class TipCommand {
       return;
     }
 
-    let message = "";
+    // Split the @-mention pool into new-recipients (get the personalized
+    // welcome line) and existing-recipients (get the Tipped confirmation
+    // line). Splitting keeps every recipient @-mentioned exactly once in
+    // the reply — duplicate @mentions are what got the bot suspended
+    // around 2026-03-24.
+    const welcomedSet = new Set(welcomed.map((u) => u.toLowerCase()));
+    const newTipped = tipped.filter((t) => welcomedSet.has(t.slice(1).toLowerCase()));
+    const existingTipped = tipped.filter((t) => !welcomedSet.has(t.slice(1).toLowerCase()));
 
-    if (welcomed.length > 0) {
-      message += `You've just received some BCH!\n\nSign in at https://tipbot.qube.cash within 7 days to claim. You can also check your balance, deposit/withdraw, and view activity.\n\n`;
-    }
-
-    const each = tipped.length > 1 ? " each" : "";
     const amountSats = bchToSatoshis(amount);
     const bchUsd = await this.priceService.getBchUsd();
     const usd = formatUsd(amountSats, bchUsd);
-    message += `Tipped ${tipped.join(", ")} ${formatBch(amountSats)} BCH${each}!`;
-    if (usd) message += ` ${usd}`;
+    const amountStr = `${formatBch(amountSats)} BCH`;
+    const usdSuffix = usd ? ` ${usd}` : "";
+
+    let message = "";
+
+    if (newTipped.length > 0) {
+      const each = newTipped.length > 1 ? " each" : "";
+      message += `${newTipped.join(", ")}, you've received ${amountStr}${each}!${usdSuffix}\n\n`;
+      message += `Sign in at https://tipbot.qube.cash within 7 days to claim. You can also check your balance, deposit/withdraw, and view activity.`;
+    }
+
+    if (existingTipped.length > 0) {
+      if (newTipped.length > 0) message += "\n\n";
+      const each = existingTipped.length > 1 ? " each" : "";
+      message += `Tipped ${existingTipped.join(", ")} ${amountStr}${each}!${usdSuffix}`;
+    }
 
     if (failed.length > 0) {
-      const failNames = failed.map(f => f.username).join(", ");
+      const failNames = failed.map((f) => f.username).join(", ");
       message += `\nCould not tip ${failNames}`;
     }
 
