@@ -12,7 +12,7 @@ export class HelpCommand {
       `BCH Tip Bot`,
       ``,
       `Manage your balance, deposit address, and withdrawals at:`,
-      `https://tipbot.qube.cash (sign in with X)`,
+      `https://tipbot.cash (sign in with X)`,
       ``,
       `Send a tip in a public tweet:`,
       `  @${this.botUsername} tip @user <amount> BCH`,

@@ -95,7 +95,7 @@ export class TipCommand {
     if (tipped.length === 0) {
       await this.responder.replyToTweet(
         ctx.tweetId!,
-        `Could not send tips. Check your balance at https://tipbot.qube.cash`
+        `Could not send tips. Check your balance at https://tipbot.cash`
       );
       return;
     }
@@ -120,7 +120,7 @@ export class TipCommand {
     if (newTipped.length > 0) {
       const each = newTipped.length > 1 ? " each" : "";
       message += `${newTipped.join(", ")}, you've received ${amountLabel}${each}!${usdSuffix}\n\n`;
-      message += `Sign in at https://tipbot.qube.cash within 7 days to claim. You can also check your balance, deposit/withdraw, and view activity.`;
+      message += `Sign in at https://tipbot.cash within 7 days to claim. You can also check your balance, deposit/withdraw, and view activity.`;
     }
 
     if (existingTipped.length > 0) {

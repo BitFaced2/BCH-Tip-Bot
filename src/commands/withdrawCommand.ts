@@ -41,7 +41,7 @@ export class WithdrawCommand {
     if (ctx.type !== "dm") {
       await this.responder.replyToTweet(
         ctx.tweetId!,
-        "Withdraw at https://tipbot.qube.cash (sign in with X)."
+        "Withdraw at https://tipbot.cash (sign in with X)."
       );
       return;
     }

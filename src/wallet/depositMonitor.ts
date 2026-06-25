@@ -217,7 +217,7 @@ export class DepositMonitor {
             "Deposit confirmed and credited"
           );
 
-          // User-facing notifications happen on https://tipbot.qube.cash —
+          // User-facing notifications happen on https://tipbot.cash —
           // they can see balance + history there. We no longer DM deposit
           // confirmations because X's E2E rollout makes DMs unreliable for
           // an increasing share of users.

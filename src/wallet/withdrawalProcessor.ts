@@ -130,7 +130,7 @@ export class WithdrawalProcessor {
     this.transactionRepo.updateStatus(txId, "confirmed");
     logger.info({ txId, userId: tx.user_id, txid }, "Withdrawal sent");
     // User-facing outcome (success/failed/review) is reflected on
-    // https://tipbot.qube.cash — we no longer DM because DMs are unreliable
+    // https://tipbot.cash — we no longer DM because DMs are unreliable
     // under X's E2E rollout.
   }
 }
