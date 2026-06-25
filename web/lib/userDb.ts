@@ -146,22 +146,41 @@ export function queueWithdrawal(
 
 export interface HistoryRow {
   id: number;
-  type: "deposit" | "withdrawal";
+  type: "deposit" | "withdrawal" | "tip_received" | "tip_sent";
   amount_satoshis: number;
-  address: string | null;
+  counterparty: string | null; // address for tx, @username for tips
   txid: string | null;
   status: string;
   created_at: string;
 }
 
-export function getRecentTransactions(userId: number, limit: number): HistoryRow[] {
+/**
+ * Recent activity for the dashboard. Unions on-chain transactions
+ * (deposits + withdrawals) and tips (received + sent + returned) into one
+ * chronological list. Tip rows show the counterparty handle; transaction
+ * rows show the on-chain address.
+ */
+export function getRecentActivity(userId: number, limit: number): HistoryRow[] {
   return db()
     .prepare(
-      `SELECT id, type, amount_satoshis, address, txid, status, created_at
+      `SELECT id, type, amount_satoshis, address AS counterparty, txid,
+              status, created_at
          FROM transactions
-        WHERE user_id = ?
-        ORDER BY id DESC
+        WHERE user_id = ? AND type IN ('deposit', 'withdrawal')
+       UNION ALL
+       SELECT t.id, 'tip_received' AS type, t.amount_satoshis,
+              u.twitter_username AS counterparty,
+              NULL AS txid, t.status, t.created_at
+         FROM tips t JOIN users u ON u.id = t.from_user_id
+        WHERE t.to_user_id = ?
+       UNION ALL
+       SELECT t.id, 'tip_sent' AS type, t.amount_satoshis,
+              u.twitter_username AS counterparty,
+              NULL AS txid, t.status, t.created_at
+         FROM tips t JOIN users u ON u.id = t.to_user_id
+        WHERE t.from_user_id = ?
+        ORDER BY created_at DESC
         LIMIT ?`
     )
-    .all(userId, limit) as HistoryRow[];
+    .all(userId, userId, userId, limit) as HistoryRow[];
 }

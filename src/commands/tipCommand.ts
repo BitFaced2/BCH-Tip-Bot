@@ -101,7 +101,7 @@ export class TipCommand {
     let message = "";
 
     if (welcomed.length > 0) {
-      message += `Welcome to BCH Tip Bot! Sign in at https://tipbot.qube.cash within 7 days or your tip returns to the sender.\n`;
+      message += `You've just received some BCH! Sign in at https://tipbot.qube.cash within 7 days to claim. Check your balance, deposit/withdraw, view activity.\n`;
     }
 
     const each = tipped.length > 1 ? " each" : "";

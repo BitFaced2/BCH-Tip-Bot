@@ -3,7 +3,7 @@ import { getSession } from "../lib/session.js";
 import {
   findInFlightWithdrawal,
   findOrClaimUser,
-  getRecentTransactions,
+  getRecentActivity,
   queueWithdrawal,
   type HistoryRow,
 } from "../lib/userDb.js";
@@ -43,7 +43,7 @@ dashboardRouter.get("/", async (req, res) => {
   }
 
   const inFlight = user ? findInFlightWithdrawal(user.id) : null;
-  const history = user ? getRecentTransactions(user.id, 10) : [];
+  const history = user ? getRecentActivity(user.id, 15) : [];
   const notice = decodeNotice(req.query.notice as string | undefined);
   res
     .type("html")
@@ -216,12 +216,12 @@ function renderDashboard(
 function renderHistorySection(rows: HistoryRow[]): string {
   const items = rows
     .map((r) => {
-      const typeLabel = r.type === "deposit" ? "Deposit" : "Withdrawal";
+      const typeLabel = labelFor(r.type);
       const link = r.txid
         ? `<a class="link" href="https://blockchair.com/bitcoin-cash/transaction/${escapeHtml(r.txid)}" target="_blank" rel="noopener">TX</a>`
         : "";
-      const addr = r.address
-        ? `<span class="muted small">${escapeHtml(shorten(r.address))}</span>`
+      const counterparty = r.counterparty
+        ? `<span class="muted small">${escapeHtml(counterpartyLabel(r.type, r.counterparty))}</span>`
         : "";
       return `
         <li>
@@ -230,7 +230,7 @@ function renderHistorySection(rows: HistoryRow[]): string {
             <span class="status status-${escapeHtml(r.status)}">${escapeHtml(r.status)}</span>
           </div>
           <div class="hrow sub">
-            <span class="muted small">${escapeHtml(r.created_at)} UTC ${addr}</span>
+            <span class="muted small">${escapeHtml(r.created_at)} UTC ${counterparty}</span>
             ${link}
           </div>
         </li>
@@ -243,6 +243,25 @@ function renderHistorySection(rows: HistoryRow[]): string {
       <ul class="history">${items}</ul>
     </section>
   `;
+}
+
+function labelFor(type: HistoryRow["type"]): string {
+  switch (type) {
+    case "deposit":
+      return "Deposit";
+    case "withdrawal":
+      return "Withdrawal";
+    case "tip_received":
+      return "Tip received";
+    case "tip_sent":
+      return "Tip sent";
+  }
+}
+
+function counterpartyLabel(type: HistoryRow["type"], cp: string): string {
+  if (type === "tip_received") return `from @${cp}`;
+  if (type === "tip_sent") return `to @${cp}`;
+  return shorten(cp);
 }
 
 function shorten(addr: string): string {
@@ -385,6 +404,8 @@ function baseCss(): string {
     .status-pending { color: #c5a700; border-color: #6b5b00; }
     .status-confirming { color: #1d9bf0; border-color: #145687; }
     .status-confirmed { color: #00ba7c; border-color: #00513a; }
+    .status-completed { color: #8899a6; border-color: #2f3336; }
+    .status-returned { color: #c5a700; border-color: #6b5b00; }
     .status-failed { color: #f4212e; border-color: #6b1015; }
   `;
 }
