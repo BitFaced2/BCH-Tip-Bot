@@ -251,15 +251,22 @@ function renderHistorySection(rows: HistoryRow[], bchUsd: number | null): string
     `;
   };
 
-  const visibleHtml = visible.map(renderRow).join("");
-  const moreHtml = rest.length > 0
-    ? `
+  const CHUNK_SIZE = 10;
+  const renderMore = (remaining: HistoryRow[]): string => {
+    if (remaining.length === 0) return "";
+    const chunk = remaining.slice(0, CHUNK_SIZE);
+    const next = remaining.slice(CHUNK_SIZE);
+    return `
         <details class="history-more">
-          <summary>Show ${rest.length} more</summary>
-          <ul class="history">${rest.map(renderRow).join("")}</ul>
+          <summary>Show ${chunk.length} more</summary>
+          <ul class="history">${chunk.map(renderRow).join("")}</ul>
+          ${renderMore(next)}
         </details>
-      `
-    : "";
+      `;
+  };
+
+  const visibleHtml = visible.map(renderRow).join("");
+  const moreHtml = renderMore(rest);
 
   return `
     <section class="card">

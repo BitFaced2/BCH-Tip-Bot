@@ -120,7 +120,7 @@ export class TipCommand {
     if (newTipped.length > 0) {
       const each = newTipped.length > 1 ? " each" : "";
       message += `${newTipped.join(", ")}, you've received ${amountLabel}${each}!${usdSuffix}\n\n`;
-      message += `Sign in at https://tipbot.cash within 7 days to claim. You can also check your balance, deposit/withdraw, and view activity.`;
+      message += `Sign in at tipbot.cash to claim your BCH, check your balance, deposit/withdraw, view activity, and start tipping others.`;
     }
 
     if (existingTipped.length > 0) {
