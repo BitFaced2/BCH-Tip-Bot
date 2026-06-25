@@ -136,7 +136,7 @@ function renderLogin(): string {
     "BCH Tip Bot",
     `
       <div class="login-hero">
-        <img src="/tip-bot-logo.png" alt="BCH Tip Bot" class="brand-logo-lg" />
+        <img src="/tip-bot-logo.webp" alt="BCH Tip Bot" class="brand-logo-lg" />
         <p class="muted">Sign in with your X account to view your balance, deposit address, and withdraw.</p>
         <a class="btn" href="/login">Sign in with X</a>
       </div>
@@ -194,7 +194,7 @@ function renderDashboard(
     `
       <header class="top">
         <a class="brand" href="/" aria-label="BCH Tip Bot">
-          <img src="/tip-bot-logo.png" alt="BCH Tip Bot" class="brand-logo" />
+          <img src="/tip-bot-logo.webp" alt="BCH Tip Bot" class="brand-logo" />
         </a>
         <form method="post" action="/logout">
           <span class="muted">@${safeUser}</span>
@@ -355,7 +355,7 @@ function page(title: string, body: string): string {
   <meta charset="utf-8" />
   <title>${escapeHtml(title)}</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="icon" type="image/png" href="/tip-bot-logo.png" />
+  <link rel="icon" type="image/webp" href="/tip-bot-logo.webp" />
   <style>${baseCss()}</style>
 </head>
 <body>
