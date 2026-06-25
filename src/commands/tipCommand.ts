@@ -101,14 +101,14 @@ export class TipCommand {
     let message = "";
 
     if (welcomed.length > 0) {
-      message += `You've just received some BCH! Sign in at https://tipbot.qube.cash within 7 days to claim. Check your balance, deposit/withdraw, view activity.\n`;
+      message += `You've just received some BCH!\n\nSign in at https://tipbot.qube.cash within 7 days to claim. You can also check your balance, deposit/withdraw, and view activity.\n\n`;
     }
 
     const each = tipped.length > 1 ? " each" : "";
     message += `Tipped ${tipped.join(", ")} ${formatBch(bchToSatoshis(amount))} BCH${each}!`;
 
     if (totalFee > 0) {
-      message += ` (fee: ${formatBch(totalFee)} BCH)`;
+      message += ` (fee: ${totalFee} sats)`;
     }
 
     if (failed.length > 0) {

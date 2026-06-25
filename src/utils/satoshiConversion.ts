@@ -9,5 +9,10 @@ export function satoshisToBch(satoshis: number): number {
 }
 
 export function formatBch(satoshis: number): string {
-  return satoshisToBch(satoshis).toFixed(8);
+  // Strip trailing zeros after the decimal so "0.00100000" reads as "0.001".
+  // Keep at least one decimal digit, so whole-BCH values render as "1.0" not "1".
+  return satoshisToBch(satoshis)
+    .toFixed(8)
+    .replace(/0+$/, "")
+    .replace(/\.$/, ".0");
 }
