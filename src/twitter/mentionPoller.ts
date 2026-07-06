@@ -39,9 +39,9 @@ export class MentionPoller {
 
   private async poll(): Promise<void> {
     try {
-      // X's search API rejects since_id values from tweets older than ~7 days.
-      // If our stored since_id is approaching that window, skip it so the next
-      // successful response refreshes the value naturally.
+      // X's mentions timeline (and search) reject since_id values from tweets
+      // older than ~7 days. If our stored since_id is approaching that window,
+      // skip it so the next response refreshes the value naturally.
       const stored = this.pollState.getWithAge("last_mention_id");
       const STALE_MS = 6 * 24 * 60 * 60 * 1000;
       const isStale = stored
@@ -59,22 +59,22 @@ export class MentionPoller {
         params.since_id = sinceId;
       }
 
-      // twitter-api-v2 has no built-in request timeout, so wrap the call to
-      // prevent a hung socket from silently stalling the poller indefinitely.
+      // userMentionTimeline instead of v2.search: search silently drops @-mentions
+      // buried past ~char 280 in long note_tweets, and the whole search endpoint
+      // was degraded for 12+ hours on 2026-07-03. Mentions timeline reads the
+      // entity list, so it catches every @mention regardless of position.
+      // Bot's own tweets are filtered client-side below.
       const result = await withTimeout(
-        this.client.v2.search(
-          `@${this.botUsername} -from:${this.botUsername}`,
-          params
-        ),
+        this.client.v2.userMentionTimeline(this.botUserId, params),
         60_000,
-        "mention search"
+        "mention timeline"
       );
 
-      const tweets = result.data?.data;
+      const tweets = result.tweets;
       if (!tweets || tweets.length === 0) return;
 
       const users = new Map<string, string>();
-      for (const user of result.data?.includes?.users ?? []) {
+      for (const user of result.includes?.users ?? []) {
         users.set(user.id, user.username);
       }
 
@@ -107,7 +107,7 @@ export class MentionPoller {
       this.pollState.set("last_mention_id", tweets[0].id);
     } catch (err: any) {
       if (err?.code === 429) {
-        logger.warn("Rate limited on search endpoint, backing off");
+        logger.warn("Rate limited on mentions endpoint, backing off");
         return;
       }
 
