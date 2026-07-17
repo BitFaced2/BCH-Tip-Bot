@@ -211,10 +211,18 @@ function renderDashboard(
           const t = document.getElementById('addr').textContent.trim();
           try { await navigator.clipboard.writeText(t); } catch (e) { /* ignore */ }
         }
-        function confirmWithdraw(form) {
-          const amount = form.amount.value;
-          const address = form.address.value;
-          return confirm('Send ' + amount + ' BCH to ' + address + '?');
+        function showConfirmWithdraw(form) {
+          // Native confirm() is suppressed by X/FB/IG in-app browsers, so
+          // we replace it with an inline confirm panel that works everywhere.
+          if (!form.checkValidity()) { form.reportValidity(); return; }
+          document.getElementById('confirm-amount').textContent = form.amount.value.trim();
+          document.getElementById('confirm-address').textContent = form.address.value.trim();
+          document.getElementById('withdraw-inputs').style.display = 'none';
+          document.getElementById('withdraw-confirm').style.display = 'block';
+        }
+        function hideConfirmWithdraw() {
+          document.getElementById('withdraw-inputs').style.display = 'block';
+          document.getElementById('withdraw-confirm').style.display = 'none';
         }
         function setMax(form) {
           const balance = Number(form.dataset.balance);
@@ -343,23 +351,34 @@ function renderWithdrawSection(
   return `
     <section class="card">
       <div class="label">Withdraw</div>
-      <form method="post" action="/withdraw" onsubmit="return confirmWithdraw(this)"
+      <form method="post" action="/withdraw" id="withdraw-form"
         data-balance="${balanceSatoshis}" data-fee="${feeSatoshis}">
-        <label class="field">
-          <span>Amount (BCH)</span>
-          <div class="input-with-max">
-            <input name="amount" type="text" inputmode="decimal" autocomplete="off" required />
-            <button type="button" class="btn-secondary max-btn" onclick="setMax(this.form)">Max</button>
+        <div id="withdraw-inputs">
+          <label class="field">
+            <span>Amount (BCH)</span>
+            <div class="input-with-max">
+              <input name="amount" type="text" inputmode="decimal" autocomplete="off" required />
+              <button type="button" class="btn-secondary max-btn" onclick="setMax(this.form)">Max</button>
+            </div>
+          </label>
+          <label class="field">
+            <span>Destination address</span>
+            <input name="address" type="text" autocomplete="off" required placeholder="bitcoincash:q..." />
+          </label>
+          <p class="muted small">
+            Min ${minBch} BCH. Max ${maxBch} BCH. Fee ${feeBch} BCH per withdrawal.
+          </p>
+          <button type="button" class="btn" onclick="showConfirmWithdraw(this.form)">Withdraw</button>
+        </div>
+        <div id="withdraw-confirm" style="display: none;">
+          <div class="label">Confirm withdrawal</div>
+          <p>Send <strong id="confirm-amount"></strong> BCH to:</p>
+          <code class="inline-addr" id="confirm-address"></code>
+          <div class="button-row">
+            <button type="button" class="btn-secondary" onclick="hideConfirmWithdraw()">Cancel</button>
+            <button type="submit" class="btn">Confirm &amp; send</button>
           </div>
-        </label>
-        <label class="field">
-          <span>Destination address</span>
-          <input name="address" type="text" autocomplete="off" required placeholder="bitcoincash:q..." />
-        </label>
-        <p class="muted small">
-          Min ${minBch} BCH. Max ${maxBch} BCH. Fee ${feeBch} BCH per withdrawal.
-        </p>
-        <button type="submit" class="btn">Withdraw</button>
+        </div>
       </form>
     </section>
   `;
@@ -515,6 +534,8 @@ function baseCss(): string {
     .input-with-max { display: flex; gap: .5rem; align-items: stretch; }
     .input-with-max input { flex: 1; min-width: 0; }
     .max-btn { padding: 0 1rem; font-size: .85rem; flex: 0 0 auto; }
+    .button-row { display: flex; gap: .75rem; margin-top: 1rem; }
+    .button-row .btn, .button-row .btn-secondary { flex: 1; }
     .field input:focus {
       outline: none;
       border-color: var(--bch-green);
