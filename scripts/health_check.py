@@ -198,7 +198,7 @@ def send_email(subject: str, body: str) -> bool:
         f"{body}"
         "</pre></body></html>"
     )
-    msg.attach(MIMEText(html, "html"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
 
     try:
         # Without an explicit timeout smtplib will wait forever on a hung
@@ -216,38 +216,60 @@ def send_email(subject: str, body: str) -> bool:
 
 
 def main() -> int:
-    issues: list[str] = []
+    # Each entry: (display name, callable returning list[str] of failure
+    # reasons — empty list means passed). Wrapping Optional[str]-returning
+    # checks in a list comprehension keeps the two shapes uniform.
+    checks = [
+        ("PM2 process online", lambda: [x for x in [check_pm2()] if x]),
+        (
+            f"Mention poller state fresh (<{MENTION_POLLER_STALE_DAYS}d)",
+            check_poll_state,
+        ),
+        (
+            f"No withdrawals stuck pending >{STUCK_WITHDRAWAL_MIN_MINUTES}m",
+            check_stuck_withdrawals,
+        ),
+        (
+            f"Disk usage below {DISK_USAGE_ALERT_PCT}%",
+            lambda: [x for x in [check_disk()] if x],
+        ),
+        ("Electrum socket healthy", lambda: [x for x in [check_electrum_jam()] if x]),
+        (
+            f"Error-log entries below {RECENT_ERROR_THRESHOLD}",
+            lambda: [x for x in [check_recent_errors()] if x],
+        ),
+    ]
 
-    try:
-        pm2_issue = check_pm2()
-        if pm2_issue:
-            issues.append(pm2_issue)
-        issues += check_poll_state()
-        issues += check_stuck_withdrawals()
-        disk_issue = check_disk()
-        if disk_issue:
-            issues.append(disk_issue)
-        electrum_issue = check_electrum_jam()
-        if electrum_issue:
-            issues.append(electrum_issue)
-        err_issue = check_recent_errors()
-        if err_issue:
-            issues.append(err_issue)
-    except subprocess.TimeoutExpired:
-        issues.append("SSH timeout while collecting health signals")
-    except Exception as e:
-        issues.append(f"Health check error: {e}")
+    results: list[tuple[str, list[str]]] = []
+    for name, check in checks:
+        try:
+            failures = check()
+        except subprocess.TimeoutExpired:
+            failures = ["SSH timeout"]
+        except Exception as e:
+            failures = [f"Check error: {e}"]
+        results.append((name, failures))
 
+    total_failures = sum(len(f) for _, f in results)
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     today = datetime.now().strftime("%Y-%m-%d")
-    if issues:
-        subject = f"[BCH Tip Bot] Health check found {len(issues)} issue(s) - {today}"
-        body_lines = [f"Health check at {now}", "", "Issues:"]
-        for i in issues:
-            body_lines.append(i if i.startswith("  ") else f"  - {i}")
+
+    body_lines = [f"Health check at {now}", ""]
+    for name, failures in results:
+        if failures:
+            body_lines.append(f"\u2717 {name}")
+            for f in failures:
+                # Pre-indented lines (multi-row check output like stuck
+                # withdrawal details) keep their own indent; single-line
+                # reasons get a nested indent under the failing check.
+                body_lines.append(f if f.startswith("  ") else f"    {f}")
+        else:
+            body_lines.append(f"\u2713 {name}")
+
+    if total_failures > 0:
+        subject = f"[BCH Tip Bot] Health check found {total_failures} issue(s) - {today}"
     else:
         subject = f"[BCH Tip Bot] Daily Health Check OK - {today}"
-        body_lines = [f"Health check at {now}", "", "All checks passed."]
 
     body = "\n".join(body_lines)
     print(body)
