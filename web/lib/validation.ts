@@ -17,7 +17,11 @@ export function normalizeCashAddress(address: string): string {
 }
 
 export function isValidAmount(amount: string): boolean {
-  return AMOUNT_RE.test(amount.trim());
+  const trimmed = amount.trim();
+  // Accept ".001" the same as "0.001" — the bot's tip validator uses
+  // parseFloat which is lenient, and users type the shorter form.
+  const normalized = trimmed.startsWith(".") ? "0" + trimmed : trimmed;
+  return AMOUNT_RE.test(normalized);
 }
 
 export function bchToSatoshis(bch: number): number {
