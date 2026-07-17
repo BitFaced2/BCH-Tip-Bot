@@ -46,6 +46,7 @@ MENTION_POLLER_STALE_DAYS = 8
 STUCK_WITHDRAWAL_MIN_MINUTES = 60
 DISK_USAGE_ALERT_PCT = 95
 RECENT_ERROR_THRESHOLD = 100
+ELECTRUM_JAM_THRESHOLD = 20
 
 
 def ssh(command: str, timeout: int = 60) -> subprocess.CompletedProcess[str]:
@@ -142,6 +143,30 @@ def check_disk() -> str | None:
     return None
 
 
+def check_electrum_jam() -> str | None:
+    # @electrum-cash/web-socket occasionally gets into a stuck-connection
+    # state where every subsequent call throws "Cannot initiate a new socket
+    # connection when an existing connection exists". While stuck, the bot
+    # can't detect deposits or broadcast withdrawals — only a restart clears
+    # it. See memory/reference_electrum_stuck_socket.md.
+    result = ssh(
+        f"grep -c 'Cannot initiate a new socket' {LOG_PATH} 2>/dev/null || echo 0"
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        count = int(result.stdout.strip())
+    except ValueError:
+        return None
+    if count >= ELECTRUM_JAM_THRESHOLD:
+        return (
+            f"Electrum socket appears jammed ({count} 'Cannot initiate a new socket' "
+            f"errors in current log, threshold {ELECTRUM_JAM_THRESHOLD}). "
+            "Recovery: pm2 restart bch-tip-bot."
+        )
+    return None
+
+
 def check_recent_errors() -> str | None:
     # pm2-logrotate rotates daily, so the current log is roughly last 24h.
     result = ssh(f'grep -c \'"level":50\' {LOG_PATH} 2>/dev/null || echo 0')
@@ -202,6 +227,9 @@ def main() -> int:
         disk_issue = check_disk()
         if disk_issue:
             issues.append(disk_issue)
+        electrum_issue = check_electrum_jam()
+        if electrum_issue:
+            issues.append(electrum_issue)
         err_issue = check_recent_errors()
         if err_issue:
             issues.append(err_issue)
