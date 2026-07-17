@@ -181,7 +181,9 @@ function renderDashboard(
       </section>
     `;
 
-  const withdrawSection = user ? renderWithdrawSection(inFlight) : "";
+  const withdrawSection = user
+    ? renderWithdrawSection(inFlight, user.balance_satoshis, config.withdrawalFeeSatoshis)
+    : "";
   const historySection = user && history.length > 0 ? renderHistorySection(history, bchUsd) : "";
   const disclaimer = user ? renderDisclaimer() : "";
 
@@ -213,6 +215,12 @@ function renderDashboard(
           const amount = form.amount.value;
           const address = form.address.value;
           return confirm('Send ' + amount + ' BCH to ' + address + '?');
+        }
+        function setMax(form) {
+          const balance = Number(form.dataset.balance);
+          const fee = Number(form.dataset.fee);
+          const maxSats = Math.max(0, balance - fee);
+          form.amount.value = (maxSats / 1e8).toFixed(8);
         }
       </script>
     `
@@ -312,7 +320,9 @@ function renderNotice(notice: { kind: string; text: string }): string {
 }
 
 function renderWithdrawSection(
-  inFlight: ReturnType<typeof findInFlightWithdrawal>
+  inFlight: ReturnType<typeof findInFlightWithdrawal>,
+  balanceSatoshis: number,
+  feeSatoshis: number
 ): string {
   if (inFlight) {
     return `
@@ -333,10 +343,14 @@ function renderWithdrawSection(
   return `
     <section class="card">
       <div class="label">Withdraw</div>
-      <form method="post" action="/withdraw" onsubmit="return confirmWithdraw(this)">
+      <form method="post" action="/withdraw" onsubmit="return confirmWithdraw(this)"
+        data-balance="${balanceSatoshis}" data-fee="${feeSatoshis}">
         <label class="field">
           <span>Amount (BCH)</span>
-          <input name="amount" type="text" inputmode="decimal" autocomplete="off" required />
+          <div class="input-with-max">
+            <input name="amount" type="text" inputmode="decimal" autocomplete="off" required />
+            <button type="button" class="btn-secondary max-btn" onclick="setMax(this.form)">Max</button>
+          </div>
         </label>
         <label class="field">
           <span>Destination address</span>
@@ -498,6 +512,9 @@ function baseCss(): string {
       font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
       transition: border-color .15s, box-shadow .15s;
     }
+    .input-with-max { display: flex; gap: .5rem; align-items: stretch; }
+    .input-with-max input { flex: 1; min-width: 0; }
+    .max-btn { padding: 0 1rem; font-size: .85rem; flex: 0 0 auto; }
     .field input:focus {
       outline: none;
       border-color: var(--bch-green);
