@@ -10,8 +10,10 @@ const logger = pino({ name: "tip-return-processor" });
  * Tips delivered to recipients who never signed in are refunded to the sender
  * after the unclaimed window elapses.
  *
- * "Unclaimed" = recipient's twitter_user_id still starts with 'pending_'.
- * Window default = 7 days.
+ * "Unclaimed" = recipient's has_claimed flag is still 0 — they have neither
+ * signed in on the dashboard nor sent a tip of their own. (Formerly keyed on
+ * the pending_ twitter_user_id prefix, which missed accounts created as a
+ * side effect of a failed tip attempt.) Window default = 7 days.
  *
  * Fee accounting is model-aware. Tips processed before commit 2a55d8c used
  * the "old" model where the recipient absorbed the fee (got amount - fee)
@@ -92,7 +94,7 @@ export class TipReturnProcessor {
            JOIN users u ON u.id = t.to_user_id
           WHERE t.status = 'completed'
             AND t.created_at < datetime('now', ?)
-            AND u.twitter_user_id LIKE 'pending_%'
+            AND u.has_claimed = 0
           ORDER BY t.id ASC`
       )
       .all(`-${this.unclaimedWindowDays} days`) as Pick<Tip, "id">[];
@@ -115,8 +117,8 @@ export class TipReturnProcessor {
         .prepare("SELECT * FROM users WHERE id = ?")
         .get(tip.to_user_id) as User | undefined;
       if (!recipient) return false;
-      if (!recipient.twitter_user_id.startsWith("pending_")) {
-        // Recipient claimed the row between findEligible and now. Don't refund.
+      if (recipient.has_claimed) {
+        // Recipient claimed their wallet between findEligible and now. Don't refund.
         return false;
       }
 

@@ -180,6 +180,12 @@ export class TipService {
       tweetId
     );
 
+    // A successful sent tip proves the sender is actively using their wallet
+    // (they can even be re-tipping received funds without ever visiting the
+    // dashboard) — mark them claimed so their own balance is never subject to
+    // return-to-sender.
+    this.userRepo.markClaimed(sender.id);
+
     // Refresh user objects
     const updatedSender = this.userRepo.findById(sender.id)!;
     const updatedRecipient = this.userRepo.findById(recipient.id)!;

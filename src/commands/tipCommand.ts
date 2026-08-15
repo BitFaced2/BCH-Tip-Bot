@@ -85,7 +85,11 @@ export class TipCommand {
       tipped.push(`@${recipientUsername}`);
       totalFee += result.feeSatoshis!;
 
-      if (result.recipient!.twitter_user_id.startsWith("pending_")) {
+      // has_claimed (not the pending_ id prefix) is the "new recipient"
+      // signal: accounts created as a side effect of a failed tip attempt
+      // carry a real twitter_user_id but were never claimed by their owner,
+      // and they should get the welcome + 7-day-claim message too.
+      if (!result.recipient!.has_claimed) {
         welcomed.push(recipientUsername);
       }
     }

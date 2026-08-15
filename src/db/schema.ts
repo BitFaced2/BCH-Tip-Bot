@@ -66,6 +66,44 @@ export function runMigrations(db: Database.Database): void {
 
   migrateAddQueuedStatus(db);
   migrateAddReturnedTipStatus(db);
+  migrateAddHasClaimed(db);
+}
+
+/**
+ * Adds users.has_claimed — the signal for "this person has actively engaged
+ * with their wallet" (dashboard sign-in or a successful sent tip). Replaces
+ * the pending_ twitter_user_id prefix as the welcome-message and
+ * return-to-sender eligibility check: the prefix misses accounts created as
+ * a side effect of a failed tip *attempt* (ensureUser runs on senders before
+ * the balance check), which have a real twitter_user_id but were never
+ * claimed by their owner.
+ *
+ * One-time backfill grandfathers every real-ID account with any activity at
+ * all (balance, tips either direction, or on-chain transactions) as claimed
+ * — the population mixes dashboard sign-ins and DM-era users we can't
+ * distinguish from tip-attempt accounts, and retroactively returning funds
+ * from someone who signed in would break the "signed in means yours forever"
+ * promise. Dormant zero-activity accounts start unclaimed: nothing to claw
+ * back, and any real owner's next dashboard visit flips the flag.
+ */
+function migrateAddHasClaimed(db: Database.Database): void {
+  const columns = db.pragma("table_info(users)") as { name: string }[];
+  if (columns.some((c) => c.name === "has_claimed")) return;
+
+  const txn = db.transaction(() => {
+    db.exec(`
+      ALTER TABLE users ADD COLUMN has_claimed INTEGER NOT NULL DEFAULT 0;
+      UPDATE users SET has_claimed = 1
+       WHERE twitter_user_id NOT LIKE 'pending_%'
+         AND (
+           balance_satoshis > 0
+           OR EXISTS (SELECT 1 FROM tips t WHERE t.from_user_id = users.id)
+           OR EXISTS (SELECT 1 FROM tips t WHERE t.to_user_id = users.id)
+           OR EXISTS (SELECT 1 FROM transactions x WHERE x.user_id = users.id)
+         );
+    `);
+  });
+  txn.immediate();
 }
 
 /**

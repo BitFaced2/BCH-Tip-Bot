@@ -8,6 +8,7 @@ export interface WebUser {
   derivation_index: number;
   deposit_address: string;
   balance_satoshis: number;
+  has_claimed: number;
 }
 
 let _db: Database.Database | null = null;
@@ -31,11 +32,11 @@ export function findOrClaimUser(
   const direct = db()
     .prepare(
       `SELECT id, twitter_user_id, twitter_username, derivation_index,
-              deposit_address, balance_satoshis
+              deposit_address, balance_satoshis, has_claimed
          FROM users WHERE twitter_user_id = ?`
     )
     .get(twitterUserId) as WebUser | undefined;
-  if (direct) return direct;
+  if (direct) return markClaimed(direct);
 
   const pendingKey = `pending_${username.toLowerCase()}`;
   // Use a transaction so the SELECT and UPDATE see the same snapshot — and so
@@ -44,7 +45,7 @@ export function findOrClaimUser(
     const row = db()
       .prepare(
         `SELECT id, twitter_user_id, twitter_username, derivation_index,
-                deposit_address, balance_satoshis
+                deposit_address, balance_satoshis, has_claimed
            FROM users WHERE LOWER(twitter_user_id) = ?`
       )
       .get(pendingKey) as WebUser | undefined;
@@ -60,7 +61,25 @@ export function findOrClaimUser(
     row.twitter_username = username;
     return row;
   });
-  return claim.immediate();
+  const claimed = claim.immediate();
+  return claimed ? markClaimed(claimed) : null;
+}
+
+// A dashboard visit is proof the owner has claimed their wallet — this is the
+// signal the bot uses for the welcome message and 7-day return-to-sender
+// eligibility, so it must be set on every sign-in path (including the
+// first-time bootstrap re-query in the dashboard route).
+function markClaimed(user: WebUser): WebUser {
+  if (!user.has_claimed) {
+    db()
+      .prepare(
+        `UPDATE users SET has_claimed = 1, updated_at = datetime('now')
+          WHERE id = ? AND has_claimed = 0`
+      )
+      .run(user.id);
+    user.has_claimed = 1;
+  }
+  return user;
 }
 
 export interface InFlightWithdrawal {

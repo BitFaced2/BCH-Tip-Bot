@@ -70,6 +70,14 @@ export class UserRepository {
       .run(twitterUserId, userId);
   }
 
+  markClaimed(userId: number): void {
+    this.db
+      .prepare(
+        "UPDATE users SET has_claimed = 1, updated_at = datetime('now') WHERE id = ? AND has_claimed = 0"
+      )
+      .run(userId);
+  }
+
   getNextDerivationIndex(): number {
     const row = this.db
       .prepare("SELECT value FROM app_state WHERE key = 'next_derivation_index'")

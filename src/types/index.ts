@@ -5,6 +5,10 @@ export interface User {
   derivation_index: number;
   deposit_address: string;
   balance_satoshis: number;
+  // 1 once the owner has engaged with their wallet (dashboard sign-in or a
+  // successful sent tip). Drives the welcome message and 7-day
+  // return-to-sender eligibility; see migrateAddHasClaimed in db/schema.ts.
+  has_claimed: number;
   created_at: string;
   updated_at: string;
 }
