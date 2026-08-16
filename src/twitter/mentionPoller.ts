@@ -59,24 +59,73 @@ export class MentionPoller {
         params.since_id = sinceId;
       }
 
-      // userMentionTimeline instead of v2.search: search silently drops @-mentions
-      // buried past ~char 280 in long note_tweets, and the whole search endpoint
-      // was degraded for 12+ hours on 2026-07-03. Mentions timeline reads the
-      // entity list, so it catches every @mention regardless of position.
+      // Poll BOTH the mentions timeline and search, then union — neither
+      // endpoint alone is complete:
+      //   - search silently drops @-mentions buried past ~char 280 in long
+      //     note_tweets (missed tip, 2026-07-06), and was down for 12+ hours
+      //     on 2026-07-03;
+      //   - the mentions timeline applies X's spam/quality filtering and
+      //     silently omits mentions from low-reputation accounts (missed tip
+      //     from a legitimate user, 2026-08-16).
+      // Duplicates are harmless: tips are idempotent per (tweet_id, recipient),
+      // and one healthy endpoint keeps the bot alive when the other degrades.
       // Bot's own tweets are filtered client-side below.
-      const result = await withTimeout(
-        this.client.v2.userMentionTimeline(this.botUserId, params),
-        60_000,
-        "mention timeline"
-      );
+      const [mentionsRes, searchRes] = await Promise.allSettled([
+        withTimeout(
+          this.client.v2.userMentionTimeline(this.botUserId, params),
+          60_000,
+          "mention timeline"
+        ),
+        withTimeout(
+          this.client.v2.search(
+            `@${this.botUsername} -from:${this.botUsername}`,
+            params
+          ),
+          60_000,
+          "mention search"
+        ),
+      ]);
 
-      const tweets = result.tweets;
-      if (!tweets || tweets.length === 0) return;
-
-      const users = new Map<string, string>();
-      for (const user of result.includes?.users ?? []) {
-        users.set(user.id, user.username);
+      if (mentionsRes.status === "rejected" && searchRes.status === "rejected") {
+        // Both sources down — let the shared error handling below classify it.
+        throw mentionsRes.reason;
       }
+      for (const [label, res] of [
+        ["mention timeline", mentionsRes],
+        ["mention search", searchRes],
+      ] as const) {
+        if (res.status === "rejected") {
+          logger.warn(
+            { err: res.reason, source: label },
+            "One mention source failed — continuing with the other"
+          );
+        }
+      }
+
+      const tweetById = new Map<string, any>();
+      const users = new Map<string, string>();
+      if (mentionsRes.status === "fulfilled") {
+        for (const tweet of mentionsRes.value.tweets ?? []) {
+          tweetById.set(tweet.id, tweet);
+        }
+        for (const user of mentionsRes.value.includes?.users ?? []) {
+          users.set(user.id, user.username);
+        }
+      }
+      if (searchRes.status === "fulfilled") {
+        for (const tweet of searchRes.value.data?.data ?? []) {
+          if (!tweetById.has(tweet.id)) tweetById.set(tweet.id, tweet);
+        }
+        for (const user of searchRes.value.data?.includes?.users ?? []) {
+          users.set(user.id, user.username);
+        }
+      }
+
+      // Newest first, matching the per-endpoint ordering the loop below expects.
+      const tweets = [...tweetById.values()].sort((a, b) =>
+        BigInt(a.id) < BigInt(b.id) ? 1 : -1
+      );
+      if (tweets.length === 0) return;
 
       // Process oldest first
       for (const tweet of [...tweets].reverse()) {
