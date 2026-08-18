@@ -144,6 +144,18 @@ def check_disk() -> str | None:
     return None
 
 
+def grep_log_count(pattern: str) -> int | None:
+    # grep -c prints the count even when it exits 1 (zero matches), so don't
+    # append "|| echo 0" — that yields "0\n0" on zero matches, which is
+    # unparseable and silently disabled this check until 2026-08-18.
+    result = ssh(f"grep -c '{pattern}' {LOG_PATH} 2>/dev/null")
+    lines = result.stdout.strip().splitlines()
+    try:
+        return int(lines[0])
+    except (ValueError, IndexError):
+        return None
+
+
 def check_electrum_jam() -> str | None:
     # Two signatures, checked in order of severity:
     #
@@ -154,14 +166,8 @@ def check_electrum_jam() -> str | None:
     #    ones and twos, but a large count means the bot spent hours fighting
     #    an upstream Electrum outage (e.g., 135 warns on 2026-08-18). That
     #    usually self-resolves; flag it so the outage window is visible.
-    result = ssh(
-        f"grep -c 'Cannot initiate a new socket' {LOG_PATH} 2>/dev/null || echo 0"
-    )
-    if result.returncode != 0:
-        return None
-    try:
-        count = int(result.stdout.strip())
-    except ValueError:
+    count = grep_log_count("Cannot initiate a new socket")
+    if count is None:
         return None
     if count >= ELECTRUM_JAM_THRESHOLD:
         return (
@@ -170,14 +176,8 @@ def check_electrum_jam() -> str | None:
             "Recovery: pm2 restart bch-tip-bot."
         )
 
-    result = ssh(
-        f"grep -c 'Electrum socket jammed' {LOG_PATH} 2>/dev/null || echo 0"
-    )
-    if result.returncode != 0:
-        return None
-    try:
-        heals = int(result.stdout.strip())
-    except ValueError:
+    heals = grep_log_count("Electrum socket jammed")
+    if heals is None:
         return None
     if heals >= ELECTRUM_HEAL_STORM_THRESHOLD:
         return (
@@ -191,12 +191,8 @@ def check_electrum_jam() -> str | None:
 
 def check_recent_errors() -> str | None:
     # pm2-logrotate rotates daily, so the current log is roughly last 24h.
-    result = ssh(f'grep -c \'"level":50\' {LOG_PATH} 2>/dev/null || echo 0')
-    if result.returncode != 0:
-        return None
-    try:
-        count = int(result.stdout.strip())
-    except ValueError:
+    count = grep_log_count('"level":50')
+    if count is None:
         return None
     if count >= RECENT_ERROR_THRESHOLD:
         return (
