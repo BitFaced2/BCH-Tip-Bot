@@ -68,14 +68,18 @@ export class HDWalletManager {
     if (this.resetting) return this.resetting;
     this.resetting = (async () => {
       const provider = (this.walletCache.get(0) as any)?.provider;
+      // Both teardown and reconnect are time-boxed: during the 2026-08-18
+      // upstream outage a reset took 2 minutes, and an unresolving
+      // disconnect() here would wedge every withReconnect caller behind the
+      // shared resetting promise.
       try {
-        await provider?.disconnect();
+        await withTimeout(provider?.disconnect() ?? Promise.resolve(), 10_000, "electrum reset disconnect");
       } catch {
         // Tearing down a jammed provider may itself throw; the socket handle
         // is cleared regardless.
       }
       try {
-        await provider?.connect();
+        await withTimeout(provider?.connect() ?? Promise.resolve(), 10_000, "electrum reset connect");
       } catch {
         // Leave reconnection to the next request if the server is unreachable.
       }

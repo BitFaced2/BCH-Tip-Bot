@@ -47,6 +47,7 @@ STUCK_WITHDRAWAL_MIN_MINUTES = 60
 DISK_USAGE_ALERT_PCT = 95
 RECENT_ERROR_THRESHOLD = 100
 ELECTRUM_JAM_THRESHOLD = 20
+ELECTRUM_HEAL_STORM_THRESHOLD = 50
 
 
 def ssh(command: str, timeout: int = 60) -> subprocess.CompletedProcess[str]:
@@ -144,11 +145,15 @@ def check_disk() -> str | None:
 
 
 def check_electrum_jam() -> str | None:
-    # @electrum-cash/web-socket occasionally gets into a stuck-connection
-    # state where every subsequent call throws "Cannot initiate a new socket
-    # connection when an existing connection exists". While stuck, the bot
-    # can't detect deposits or broadcast withdrawals — only a restart clears
-    # it. See memory/reference_electrum_stuck_socket.md.
+    # Two signatures, checked in order of severity:
+    #
+    # 1. Raw jam error escaping to the log means the hdWallet auto-heal
+    #    (shipped 2026-08-15) is NOT catching it — that's the old hard-stuck
+    #    state and needs a manual restart.
+    # 2. The auto-heal's own "Electrum socket jammed" warnings are normal in
+    #    ones and twos, but a large count means the bot spent hours fighting
+    #    an upstream Electrum outage (e.g., 135 warns on 2026-08-18). That
+    #    usually self-resolves; flag it so the outage window is visible.
     result = ssh(
         f"grep -c 'Cannot initiate a new socket' {LOG_PATH} 2>/dev/null || echo 0"
     )
@@ -160,9 +165,26 @@ def check_electrum_jam() -> str | None:
         return None
     if count >= ELECTRUM_JAM_THRESHOLD:
         return (
-            f"Electrum socket appears jammed ({count} 'Cannot initiate a new socket' "
-            f"errors in current log, threshold {ELECTRUM_JAM_THRESHOLD}). "
+            f"Electrum socket hard-jammed ({count} raw jam errors escaped the "
+            f"auto-heal, threshold {ELECTRUM_JAM_THRESHOLD}). "
             "Recovery: pm2 restart bch-tip-bot."
+        )
+
+    result = ssh(
+        f"grep -c 'Electrum socket jammed' {LOG_PATH} 2>/dev/null || echo 0"
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        heals = int(result.stdout.strip())
+    except ValueError:
+        return None
+    if heals >= ELECTRUM_HEAL_STORM_THRESHOLD:
+        return (
+            f"Electrum auto-heal storm: {heals} jam-reset cycles in current log "
+            f"(threshold {ELECTRUM_HEAL_STORM_THRESHOLD}) — upstream Electrum "
+            "outage likely. Usually self-resolves; verify deposits are flowing "
+            "and check whether the warns have stopped."
         )
     return None
 

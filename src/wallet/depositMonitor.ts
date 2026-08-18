@@ -127,8 +127,11 @@ export class DepositMonitor {
           );
         }
       } catch (err) {
+        // mainnet-js occasionally rejects with undefined during provider
+        // outages — coerce so the log line always carries a diagnosable err
+        // (the 2026-08-18 incident produced 134 error lines with no payload).
         logger.error(
-          { err, userId: user.id },
+          { err: err ?? new Error("undefined rejection from wallet layer"), userId: user.id },
           "Error scanning deposits for user"
         );
       }
