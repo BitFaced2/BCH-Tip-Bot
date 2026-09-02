@@ -169,7 +169,7 @@ function renderDashboard(
         <div class="addr" id="addr">${escapeHtml(user.deposit_address)}</div>
         <div class="row">
           <button class="btn-secondary" onclick="copyAddr()">Copy</button>
-          <span class="muted small">Send BCH here. Credited after 3 confirmations.</span>
+          <span class="muted small">Send BCH here. Credited on receipt (0-conf), usually within minutes.</span>
         </div>
       </section>
     `
