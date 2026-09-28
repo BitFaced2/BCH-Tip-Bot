@@ -4,8 +4,10 @@ import {
   findInFlightWithdrawal,
   findOrClaimUser,
   getRecentActivity,
+  getLifetimeStats,
   queueWithdrawal,
   type HistoryRow,
+  type LifetimeStats,
 } from "../lib/userDb.js";
 import { ensureUserViaBot } from "../lib/botInternalClient.js";
 import { getBchUsd, formatUsd } from "../lib/priceClient.js";
@@ -45,11 +47,12 @@ dashboardRouter.get("/", async (req, res) => {
 
   const inFlight = user ? findInFlightWithdrawal(user.id) : null;
   const history = user ? getRecentActivity(user.id, 50) : [];
+  const stats = user ? getLifetimeStats(user.id) : null;
   const notice = decodeNotice(req.query.notice as string | undefined);
   const bchUsd = await getBchUsd();
   res
     .type("html")
-    .send(renderDashboard(session.username, user, inFlight, history, notice, bchUsd));
+    .send(renderDashboard(session.username, user, inFlight, history, stats, notice, bchUsd));
 });
 
 dashboardRouter.post("/withdraw", (req, res) => {
@@ -149,6 +152,7 @@ function renderDashboard(
   user: ReturnType<typeof findOrClaimUser>,
   inFlight: ReturnType<typeof findInFlightWithdrawal>,
   history: HistoryRow[],
+  stats: LifetimeStats | null,
   notice: { kind: string; text: string } | null,
   bchUsd: number | null
 ): string {
@@ -185,6 +189,10 @@ function renderDashboard(
     ? renderWithdrawSection(inFlight, user.balance_satoshis, config.withdrawalFeeSatoshis)
     : "";
   const historySection = user && history.length > 0 ? renderHistorySection(history, bchUsd) : "";
+  const statsSection =
+    user && stats && (stats.sent_count > 0 || stats.received_count > 0)
+      ? renderStatsSection(stats, bchUsd)
+      : "";
   const disclaimer = user ? renderDisclaimer() : "";
 
   return page(
@@ -204,6 +212,7 @@ function renderDashboard(
       ${notice ? renderNotice(notice) : ""}
       ${accountSection}
       ${withdrawSection}
+      ${statsSection}
       ${historySection}
 
       <script>
@@ -285,6 +294,42 @@ function renderHistorySection(rows: HistoryRow[], bchUsd: number | null): string
       <div class="label">Recent activity</div>
       <ul class="history">${visibleHtml}</ul>
       ${moreHtml}
+    </section>
+  `;
+}
+
+function renderStatsSection(stats: LifetimeStats, bchUsd: number | null): string {
+  const sentUsd = formatUsd(stats.sent_total, bchUsd);
+  const recvUsd = formatUsd(stats.received_total, bchUsd);
+  const tipsWord = (n: number) => (n === 1 ? "tip" : "tips");
+
+  const sentBreakdown =
+    stats.sent_returned > 0
+      ? `
+        <div class="hrow sub">
+          <span class="muted small">delivered ${formatBch(stats.sent_kept)} · returned ${formatBch(stats.sent_returned)}</span>
+          <span></span>
+        </div>`
+      : "";
+
+  return `
+    <section class="card">
+      <div class="label">Lifetime stats</div>
+      <ul class="history">
+        <li>
+          <div class="hrow">
+            <span><strong>Tipped</strong> ${formatBch(stats.sent_total)} BCH${sentUsd ? ` <span class="muted small">${sentUsd}</span>` : ""}</span>
+            <span class="muted small">${stats.sent_count} ${tipsWord(stats.sent_count)}</span>
+          </div>
+          ${sentBreakdown}
+        </li>
+        <li>
+          <div class="hrow">
+            <span><strong>Received</strong> ${formatBch(stats.received_total)} BCH${recvUsd ? ` <span class="muted small">${recvUsd}</span>` : ""}</span>
+            <span class="muted small">${stats.received_count} ${tipsWord(stats.received_count)}</span>
+          </div>
+        </li>
+      </ul>
     </section>
   `;
 }

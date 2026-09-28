@@ -163,6 +163,36 @@ export function queueWithdrawal(
   return result;
 }
 
+export interface LifetimeStats {
+  sent_total: number; // completed + returned — everything the user ever tipped
+  sent_count: number;
+  sent_kept: number; // delivered and kept by recipients
+  sent_returned: number; // came back via 7-day return-to-sender
+  received_total: number; // completed only — returned tips never really arrived
+  received_count: number;
+}
+
+export function getLifetimeStats(userId: number): LifetimeStats {
+  const sent = db()
+    .prepare(
+      `SELECT
+         COALESCE(SUM(CASE WHEN status IN ('completed','returned') THEN amount_satoshis END), 0) AS sent_total,
+         COUNT(CASE WHEN status IN ('completed','returned') THEN 1 END) AS sent_count,
+         COALESCE(SUM(CASE WHEN status = 'completed' THEN amount_satoshis END), 0) AS sent_kept,
+         COALESCE(SUM(CASE WHEN status = 'returned' THEN amount_satoshis END), 0) AS sent_returned
+       FROM tips WHERE from_user_id = ?`
+    )
+    .get(userId) as Omit<LifetimeStats, "received_total" | "received_count">;
+  const received = db()
+    .prepare(
+      `SELECT COALESCE(SUM(amount_satoshis), 0) AS received_total,
+              COUNT(*) AS received_count
+         FROM tips WHERE to_user_id = ? AND status = 'completed'`
+    )
+    .get(userId) as Pick<LifetimeStats, "received_total" | "received_count">;
+  return { ...sent, ...received };
+}
+
 export interface HistoryRow {
   id: number;
   type: "deposit" | "withdrawal" | "tip_received" | "tip_sent";
