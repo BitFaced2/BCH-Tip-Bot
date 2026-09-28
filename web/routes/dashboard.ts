@@ -159,21 +159,12 @@ function renderDashboard(
   const safeUser = escapeHtml(username);
 
   const balanceUsd = user ? formatUsd(user.balance_satoshis, bchUsd) : null;
-  const accountSection = user
+  const balanceSection = user
     ? `
       <section class="card card-balance">
         <div class="label">Balance</div>
         <div class="value balance-amount">${formatBch(user.balance_satoshis)}&nbsp;BCH</div>
         <div class="muted small">${user.balance_satoshis.toLocaleString()} satoshis${balanceUsd ? " · " + balanceUsd : ""}
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="label">Deposit address</div>
-        <div class="addr" id="addr">${escapeHtml(user.deposit_address)}</div>
-        <div class="row">
-          <button class="btn-secondary" onclick="copyAddr()">Copy</button>
-          <span class="muted small">Send BCH here. Credited on receipt (0-conf), usually within minutes.</span>
         </div>
       </section>
     `
@@ -184,6 +175,18 @@ function renderDashboard(
         Your deposit address will appear here once the tip is processed.</p>
       </section>
     `;
+  const depositSection = user
+    ? `
+      <section class="card">
+        <div class="label">Deposit address</div>
+        <div class="addr" id="addr">${escapeHtml(user.deposit_address)}</div>
+        <div class="row">
+          <button class="btn-secondary" onclick="copyAddr()">Copy</button>
+          <span class="muted small">Send BCH here. Credited on receipt (0-conf), usually within minutes.</span>
+        </div>
+      </section>
+    `
+    : "";
 
   const withdrawSection = user
     ? renderWithdrawSection(inFlight, user.balance_satoshis, config.withdrawalFeeSatoshis)
@@ -210,9 +213,10 @@ function renderDashboard(
 
       ${disclaimer}
       ${notice ? renderNotice(notice) : ""}
-      ${accountSection}
-      ${withdrawSection}
+      ${balanceSection}
       ${statsSection}
+      ${depositSection}
+      ${withdrawSection}
       ${historySection}
 
       <script>
