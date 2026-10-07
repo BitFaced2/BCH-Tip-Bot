@@ -144,6 +144,22 @@ def check_disk() -> str | None:
     return None
 
 
+def check_disk_tripwire() -> list[str]:
+    # ~/disk-tripwire/check.sh (cron, every 10 min) snapshots the biggest
+    # directories whenever root FS crosses 80% — so transient fills that
+    # evaporate before anyone looks (like the unexplained ~48G spike on
+    # 2026-10-06) leave evidence. Surface any snapshots in the digest.
+    result = ssh("ls -t ~/disk-tripwire/spike-*.txt 2>/dev/null | head -5")
+    names = [n for n in result.stdout.strip().splitlines() if n]
+    if not names:
+        return []
+    return [
+        f"Disk tripwire captured {len(names)} spike snapshot(s) — disk crossed 80% since last cleanup:",
+        *[f"  - {n}" for n in names],
+        "  Inspect with: ssh + cat, then delete the files to clear this alert.",
+    ]
+
+
 def grep_log_count(pattern: str) -> int | None:
     # grep -c prints the count even when it exits 1 (zero matches), so don't
     # append "|| echo 0" — that yields "0\n0" on zero matches, which is
@@ -251,6 +267,7 @@ def main() -> int:
             f"Disk usage below {DISK_USAGE_ALERT_PCT}%",
             lambda: [x for x in [check_disk()] if x],
         ),
+        ("No disk-spike snapshots pending", check_disk_tripwire),
         ("Electrum socket healthy", lambda: [x for x in [check_electrum_jam()] if x]),
         (
             f"Error-log entries below {RECENT_ERROR_THRESHOLD}",
