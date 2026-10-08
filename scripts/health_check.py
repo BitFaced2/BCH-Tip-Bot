@@ -277,12 +277,19 @@ def main() -> int:
 
     results: list[tuple[str, list[str]]] = []
     for name, check in checks:
-        try:
-            failures = check()
-        except subprocess.TimeoutExpired:
-            failures = ["SSH timeout"]
-        except Exception as e:
-            failures = [f"Check error: {e}"]
+        # One retry on SSH timeout: a single hung connection (transient
+        # network blip, 2026-10-08) shouldn't put a false ✗ in the digest.
+        # A repeat timeout is reported — that's a real connectivity problem.
+        failures: list[str] = []
+        for attempt in (1, 2):
+            try:
+                failures = check()
+                break
+            except subprocess.TimeoutExpired:
+                failures = ["SSH timeout (twice — likely real connectivity issue)"]
+            except Exception as e:
+                failures = [f"Check error: {e}"]
+                break
         results.append((name, failures))
 
     total_failures = sum(len(f) for _, f in results)
