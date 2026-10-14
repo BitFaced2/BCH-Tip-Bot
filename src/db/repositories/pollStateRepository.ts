@@ -32,4 +32,18 @@ export class PollStateRepository {
   delete(key: string): void {
     this.db.prepare("DELETE FROM poll_state WHERE key = ?").run(key);
   }
+
+  /**
+   * Backdate a row's updated_at without touching its value — used to retire a
+   * since_id that X has rejected as too old while keeping the id itself as a
+   * local high-water mark. Deleting the row instead would lose that mark and
+   * let the next poll replay every mention X still returns.
+   */
+  expire(key: string, daysAgo: number): void {
+    this.db
+      .prepare(
+        `UPDATE poll_state SET updated_at = datetime('now', ?) WHERE key = ?`
+      )
+      .run(`-${daysAgo} days`, key);
+  }
 }

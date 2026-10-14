@@ -39,14 +39,26 @@ export class MentionPoller {
 
   private async poll(): Promise<void> {
     try {
-      // X's mentions timeline (and search) reject since_id values from tweets
-      // older than ~7 days. If our stored since_id is approaching that window,
-      // skip it so the next response refreshes the value naturally.
+      // The stored id serves two distinct purposes, and conflating them caused
+      // a replay storm on 2026-10-14:
+      //
+      //   - highWaterMark: the newest mention we have already handled. ALWAYS
+      //     used to filter locally.
+      //   - sinceId: the same id handed to X to narrow the request. X rejects
+      //     ids older than ~7 days, so after a long quiet stretch we must stop
+      //     sending it.
+      //
+      // Previously the local filter was also keyed on sinceId, so the moment
+      // the staleness guard dropped it (6 days with no new mentions — routine
+      // for a small bot) the poller reprocessed every mention X still returned:
+      // 19 old commands replayed at once, and a tweet whose tip had legitimately
+      // failed weeks earlier got a fresh "Could not send tips" reply.
       const stored = this.pollState.getWithAge("last_mention_id");
       const STALE_MS = 6 * 24 * 60 * 60 * 1000;
       const isStale = stored
         ? Date.now() - new Date(stored.updatedAt.replace(" ", "T") + "Z").getTime() > STALE_MS
         : false;
+      const highWaterMark = stored?.value;
       const sinceId = stored && !isStale ? stored.value : undefined;
 
       const params: Record<string, any> = {
@@ -134,8 +146,10 @@ export class MentionPoller {
         // Skip tweets from the bot itself
         if (tweet.author_id === this.botUserId) continue;
 
-        // Skip tweets older than our last processed ID
-        if (sinceId && tweet.id <= sinceId) continue;
+        // Skip anything at or below the high-water mark, whether or not we
+        // were able to send since_id. BigInt, not string compare: ids of
+        // different lengths sort wrong lexicographically.
+        if (highWaterMark && BigInt(tweet.id) <= BigInt(highWaterMark)) continue;
 
         const ctx: CommandContext = {
           type: "mention",
@@ -152,24 +166,31 @@ export class MentionPoller {
         }
       }
 
-      // Update since_id to the newest tweet
-      this.pollState.set("last_mention_id", tweets[0].id);
+      // Advance the high-water mark, never retreat it. A stale-since_id
+      // request is unfiltered, so its newest result can be older than what
+      // we've already processed — writing that back would re-open the
+      // window we just closed.
+      const newest = tweets[0].id;
+      if (!highWaterMark || BigInt(newest) > BigInt(highWaterMark)) {
+        this.pollState.set("last_mention_id", newest);
+      }
     } catch (err: any) {
       if (err?.code === 429) {
         logger.warn("Rate limited on mentions endpoint, backing off");
         return;
       }
 
-      // X rejects since_id values pointing to tweets older than ~7 days.
-      // Clear the row so the next poll fetches the latest tweets without a
-      // since_id; tipService dedups by (tweet_id, recipient) so re-processing
-      // already-handled mentions is a no-op.
+      // X rejects since_id values pointing to tweets older than ~7 days. The
+      // local staleness guard normally retires the id first, so this is a
+      // backstop for X tightening that window. Backdate the row rather than
+      // deleting it: the next poll then omits since_id, but the id survives as
+      // the high-water mark that stops already-handled mentions from replaying.
       const sinceIdError = err?.data?.errors?.find(
         (e: any) => e?.parameters?.since_id
       );
       if (err?.code === 400 && sinceIdError) {
-        logger.warn("since_id outside 7-day window, clearing for fresh fetch");
-        this.pollState.delete("last_mention_id");
+        logger.warn("since_id outside 7-day window, retiring it for fresh fetch");
+        this.pollState.expire("last_mention_id", 30);
         return;
       }
 
